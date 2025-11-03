@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -10,6 +9,9 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Layout } from '@/components/layout/Layout';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
+import { AUTH_LOGIN, LoginResponse, LoginVariables } from '@/services/authService';
+import { useMutation } from '@apollo/client/react';
+
 
 const loginSchema = z.object({
   email: z.string().email('Email inválido'),
@@ -19,10 +21,11 @@ const loginSchema = z.object({
 type LoginForm = z.infer<typeof loginSchema>;
 
 const Login = () => {
-  const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+
+  const [loginMutation, { loading }] = useMutation<LoginResponse, LoginVariables>(AUTH_LOGIN);
 
   const {
     register,
@@ -33,32 +36,43 @@ const Login = () => {
   });
 
   const onSubmit = async (data: LoginForm) => {
-    setLoading(true);
-    
+
     try {
-      const success = login(data.email, data.password);
-      
-      if (success) {
+      const result = await loginMutation({
+        variables: {
+          email: data.email,
+          password: data.password,
+        },
+      });
+
+      const { success, token } = result.data.login;
+
+      if (success && token) {
+        localStorage.setItem('token', token);
+
+        login(data.email, data.password);
+
         toast({
           title: "Inicio de sesión exitoso",
           description: "Bienvenido a PetStore",
         });
-        navigate('/');
-      } else {
+        navigate('/admin/promotions');
+      }
+    } catch (error: any) {
+      const errorMessage = error?.message || error?.graphQLErrors?.[0]?.message || "";
+      if (errorMessage.includes('non null type')) {
         toast({
           title: "Error de autenticación",
           description: "Email o contraseña incorrectos",
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: error.message || "Ocurrió un error inesperado",
           variant: "destructive",
         });
       }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Ocurrió un error inesperado",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -100,17 +114,16 @@ const Login = () => {
                   )}
                 </div>
 
-                <Button 
-                  type="submit" 
-                  className="w-full" 
+                <Button
+                  type="submit"
+                  className="w-full"
                   disabled={loading}
                 >
                   {loading ? 'Iniciando sesión...' : 'Iniciar sesión'}
                 </Button>
 
                 <div className="text-center">
-                  <a 
-                    href="#" 
+                  <a href="#"
                     className="text-sm text-primary hover:underline"
                   >
                     ¿Olvidaste tu contraseña?
