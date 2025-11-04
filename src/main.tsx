@@ -1,10 +1,19 @@
-import { createRoot } from "react-dom/client";
-import { ApolloProvider } from "@apollo/client/react";
-import client from "./lib/apolloClient.ts";
-import App from "./App.tsx";
-import "./index.css";
+import { createRoot } from 'react-dom/client';
+import { ApolloProvider } from '@apollo/client/react';
+import client from './lib/apolloClient.ts';
+import { BrowserRouter } from 'react-router-dom';
+import { AuthProvider } from '@/context/AuthContext';
+import App from './App.tsx';
+import './index.css';
 
-createRoot(document.getElementById('root')!).render(
-    <ApolloProvider client={client}>
-        <App />
-    </ApolloProvider>);
+const root = createRoot(document.getElementById('root')!);
+
+root.render(
+    <BrowserRouter>
+        <ApolloProvider client={client}>
+            <AuthProvider>
+                <App />
+            </AuthProvider>
+        </ApolloProvider>
+    </BrowserRouter>
+);

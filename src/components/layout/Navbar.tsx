@@ -5,10 +5,20 @@ import pawLogo from '@/assets/paw-logo.png';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
 import { SettingsPanel } from '@/components/SettingsPanel';
+import { useToast } from "@/components/ui/use-toast";
 
 export const Navbar = () => {
   const location = useLocation();
   const { user, logout } = useAuth();
+  const { toast } = useToast();
+
+  const handleLogout = () => {
+    logout();
+    toast({
+      title: "Sesión cerrada",
+      description: "Has salido correctamente de tu cuenta.",
+    });
+  };
 
   const navItems = [
     { name: 'Productos', path: '/admin/promotions', key: 'productos' },
@@ -22,7 +32,7 @@ export const Navbar = () => {
           <img src={pawLogo} alt="PetStore" className="w-8 h-8" />
           <span className="text-xl font-bold text-primary">PetStore</span>
         </Link>
-        
+
         <nav className="flex items-center gap-6">
           {navItems.map((item) => (
             <Link
@@ -43,17 +53,17 @@ export const Navbar = () => {
 
       <div className="flex items-center gap-4">
         <SettingsPanel />
-        
+
         <Link to="/admin/promotions">
           <Button variant="ghost" size="icon" className="text-primary hover:bg-accent">
             <ShoppingCart size={20} />
           </Button>
         </Link>
-        
+
         {user ? (
           <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">{user.email}</span>
-            <Button variant="ghost" size="sm" onClick={logout} className="text-primary hover:bg-accent">
+            <span className="text-sm text-muted-foreground">{user}</span>
+            <Button variant="ghost" size="sm" onClick={handleLogout} className="text-primary hover:bg-accent">
               Salir
             </Button>
           </div>
