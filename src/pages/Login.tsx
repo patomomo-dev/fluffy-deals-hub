@@ -50,7 +50,7 @@ const Login = () => {
       if (success && token) {
         localStorage.setItem('token', token);
 
-        login(data.email, data.password);
+        login(data.email, data.password, token);
 
         toast({
           title: "Inicio de sesión exitoso",

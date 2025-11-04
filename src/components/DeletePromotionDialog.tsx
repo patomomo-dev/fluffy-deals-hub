@@ -22,6 +22,7 @@ export const DeletePromotionDialog = ({
   onConfirm,
   promotionName,
 }: DeletePromotionDialogProps) => {
+   console.log('🟢 DeletePromotionDialog - open:', open, 'promotionName:', promotionName);
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent className="bg-card">
@@ -34,7 +35,7 @@ export const DeletePromotionDialog = ({
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel className="bg-secondary hover:bg-secondary/80">
+          <AlertDialogCancel className="bg-secondary">
             Cerrar
           </AlertDialogCancel>
           <AlertDialogAction
