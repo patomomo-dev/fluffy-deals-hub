@@ -7,7 +7,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
-export type PromotionStatus = 'all' | 'active' | 'scheduled' | 'expired' | 'trash';
+export type PromotionStatus = 'ALL' | 'ACTIVE' | 'SCHEDULE' | 'EXPIRED' | 'TRASH';
 
 interface PromotionFiltersProps {
   selectedFilter: PromotionStatus;
@@ -23,31 +23,31 @@ export const PromotionFilters = ({ selectedFilter, onFilterChange }: PromotionFi
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="all">
+          <SelectItem value="ALL">
             <div className="flex items-center gap-2">
               <Filter size={16} />
               <span>Todas</span>
             </div>
           </SelectItem>
-          <SelectItem value="active">
+          <SelectItem value="ACTIVE">
             <div className="flex items-center gap-2">
               <CheckCircle size={16} className="text-success" />
               <span>Activas</span>
             </div>
           </SelectItem>
-          <SelectItem value="scheduled">
+          <SelectItem value="SCHEDULE">
             <div className="flex items-center gap-2">
               <Clock size={16} className="text-primary" />
               <span>Programadas</span>
             </div>
           </SelectItem>
-          <SelectItem value="expired">
+          <SelectItem value="EXPIRED">
             <div className="flex items-center gap-2">
               <XCircle size={16} className="text-muted-foreground" />
               <span>Vencidas</span>
             </div>
           </SelectItem>
-          <SelectItem value="trash">
+          <SelectItem value="TRASH">
             <div className="flex items-center gap-2">
               <Trash2 size={16} className="text-destructive" />
               <span>Papelera</span>

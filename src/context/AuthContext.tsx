@@ -14,7 +14,6 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<string | null>(null);
 
-  // Leer usuario guardado en localStorage al iniciar
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
     if (storedUser) setUser(storedUser);
