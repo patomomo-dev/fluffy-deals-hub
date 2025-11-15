@@ -27,9 +27,6 @@ const PromotionsList = () => {
   const [selectedPromotion, setSelectedPromotion] = useState<{ id: string; name: string } | null>(null);
   const [filter, setFilter] = useState<PromotionStatus>('all');
 
-  console.log('🔵 PromotionsList render - deleteDialogOpen:', deleteDialogOpen);
-  console.log('🔵 selectedPromotion:', selectedPromotion);
-
   const { data, loading, error, refetch } = useQuery<PromotionsResponse>(GET_PROMOTIONS);
 
   const getPromotionImage = (categoryName: string) => {
@@ -38,7 +35,7 @@ const PromotionsList = () => {
       'accesorios': accessoriesPromotions,
       'higiene': hygienePromotions,
       'salud': healthPromotions,
-      'jueguetes': toysPromotions,
+      'juguetes': toysPromotions,
       'transporte': transportPromotions,
       'ropa': clothesPromotions,
       'acuarios y terrarios': aquariumPromotions,
@@ -80,10 +77,8 @@ const PromotionsList = () => {
   }) || [];
 
   const handleDeleteClick = (id: string, name: string) => {
-    console.log('🔴 Click en Eliminar - ID:', id, 'Name:', name);
     setSelectedPromotion({ id, name });
     setDeleteDialogOpen(true);
-    console.log('🔴 Estados actualizados');
   };
 
   const handleDeleteConfirm = () => {

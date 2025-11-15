@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { useMutation, useQuery } from '@apollo/client/react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,9 +12,20 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Layout } from '@/components/layout/Layout';
-import { usePromotions } from '@/hooks/usePromotions';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Package } from 'lucide-react';
+import { ArrowLeft, Package, Loader2 } from 'lucide-react';
+import {
+  CREATE_PROMOTION,
+  ASSOCIATE_PRODUCTS_TO_PROMOTION,
+  GET_CATEGORIES,
+  GET_PRODUCTS_BY_CATEGORY,
+  GET_PROMOTIONS,
+  type CategoriesResponse,
+  type ProductsByCategoryResponse,
+  type CreatePromotionResponse,
+  type CreatePromotionInput,
+} from '@/services/promotionService';
+import { GET_CURRENT_USER, type CurrentUserResponse } from '@/services/authService';
 
 const promotionSchema = z.object({
   name: z.string().min(1, 'Nombre requerido'),
@@ -43,12 +55,10 @@ const promotionSchema = z.object({
 type PromotionForm = z.infer<typeof promotionSchema>;
 
 const CreatePromotion = () => {
-  const [loading, setLoading] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const [formData, setFormData] = useState<Partial<PromotionForm>>({});
-  const { addPromotion } = usePromotions();
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -63,39 +73,71 @@ const CreatePromotion = () => {
     resolver: zodResolver(promotionSchema),
   });
 
-  const categories = [
-    { value: 'alimento', label: 'Alimento' },
-    { value: 'juguetes', label: 'Juguetes' },
-    { value: 'cuidado', label: 'Cuidado e Higiene' },
-    { value: 'accesorios', label: 'Accesorios' },
-  ];
+  const { data: categoriesData, loading: categoriesLoading } = useQuery<CategoriesResponse>(GET_CATEGORIES);
 
-  const productsByCategory: Record<string, Array<{id: string, name: string, price: number}>> = {
-    alimento: [
-      { id: '1', name: 'Alimento Premium para Perros', price: 45.99 },
-      { id: '2', name: 'Alimento para Gatos Adultos', price: 32.50 },
-      { id: '3', name: 'Snacks Naturales', price: 15.75 },
-      { id: '4', name: 'Alimento para Cachorros', price: 38.90 },
-    ],
-    juguetes: [
-      { id: '5', name: 'Pelota de Goma', price: 12.99 },
-      { id: '6', name: 'Rascador para Gatos', price: 89.99 },
-      { id: '7', name: 'Cuerda para Perros', price: 18.50 },
-      { id: '8', name: 'Ratón de Peluche', price: 8.75 },
-    ],
-    cuidado: [
-      { id: '9', name: 'Champú para Mascotas', price: 24.99 },
-      { id: '10', name: 'Cepillo Dental', price: 16.50 },
-      { id: '11', name: 'Toallitas Húmedas', price: 12.25 },
-      { id: '12', name: 'Cortaúñas Profesional', price: 35.00 },
-    ],
-    accesorios: [
-      { id: '13', name: 'Collar Ajustable', price: 22.99 },
-      { id: '14', name: 'Correa Retráctil', price: 45.50 },
-      { id: '15', name: 'Cama Acolchada', price: 75.00 },
-      { id: '16', name: 'Bebedero Automático', price: 89.99 },
-    ],
-  };
+  const { data: currentUserData, loading: userLoading } = useQuery<CurrentUserResponse>(GET_CURRENT_USER);
+
+  const { data: productsData, loading: productsLoading } = useQuery<ProductsByCategoryResponse>(
+    GET_PRODUCTS_BY_CATEGORY,
+    {
+      variables: { categoryId: selectedCategory || formData.category },
+      skip: !selectedCategory && !formData.category,
+    }
+  );
+
+  const [createPromotion, { loading: createLoading }] = useMutation<CreatePromotionResponse>(
+    CREATE_PROMOTION,
+    {
+      refetchQueries: [{ query: GET_PROMOTIONS }],
+      onCompleted: (data) => {
+        if (selectedProducts.length > 0) {
+          associateProducts({
+            variables: {
+              promotionId: data.createPromotion.promotionId,
+              productIds: selectedProducts,
+            },
+          });
+        } else {
+          toast({
+            title: "Promoción creada",
+            description: "La promoción se ha creado exitosamente",
+          });
+          navigate('/admin/promotions');
+        }
+      },
+      onError: (error) => {
+        console.error('Error al crear promoción:', error);
+        toast({
+          title: "Error",
+          description: error.message || "Ocurrió un error al crear la promoción",
+          variant: "destructive",
+        });
+      },
+    }
+  );
+
+  const [associateProducts, { loading: associateLoading }] = useMutation(
+    ASSOCIATE_PRODUCTS_TO_PROMOTION,
+    {
+      refetchQueries: [{ query: GET_PROMOTIONS }],
+      onCompleted: () => {
+        toast({
+          title: "Promoción creada",
+          description: "La promoción y los productos se han asociado exitosamente",
+        });
+        navigate('/admin/promotions');
+      },
+      onError: (error) => {
+        console.error('Error al asociar productos:', error);
+        toast({
+          title: "Advertencia",
+          description: "La promoción se creó pero hubo un error al asociar algunos productos",
+          variant: "destructive",
+        });
+        navigate('/admin/promotions');
+      },
+    }
+  );
 
   const handleNextStep = async () => {
     const isValid = await trigger(['name', 'description', 'category', 'discount', 'startDate', 'endDate']);
@@ -125,48 +167,38 @@ const CreatePromotion = () => {
       return;
     }
 
-    setLoading(true);
-    
     try {
-      const imageMap: Record<string, string> = {
-        'alimento': 'dog-products',
-        'juguetes': 'cat-products',
-        'cuidado': 'dog-products',
-        'accesorios': 'cat-products',
-      };
+      if (!currentUserData?.currentUser?.userId) {
+        toast({
+          title: "Error",
+          description: "No se pudo obtener la información del usuario. Por favor, inicia sesión nuevamente.",
+          variant: "destructive",
+        });
+        return;
+      }
 
-      addPromotion({
-        name: formData.name || data.name,
+      const input: CreatePromotionInput = {
+        promotionName: formData.name || data.name,
         description: formData.description || data.description,
-        category: formData.category || data.category,
-        discount: formData.discount || data.discount,
         startDate: formData.startDate || data.startDate,
         endDate: formData.endDate || data.endDate,
-        image: imageMap[formData.category || data.category] || 'dog-products',
-        isActive: true,
-        selectedProducts: selectedProducts,
-      });
+        discountPercentage: Number(formData.discount || data.discount),
+        categoryId: Number(formData.category || data.category),
+        statusId: "1",
+        userId: Number(currentUserData.currentUser.userId),
+      };
 
-      toast({
-        title: "Promoción creada",
-        description: "La promoción se ha creado exitosamente",
+      await createPromotion({
+        variables: { input },
       });
-      
-      navigate('/admin/promotions');
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Ocurrió un error al crear la promoción",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
+      console.error('Error en onSubmit:', error);
     }
   };
 
   const toggleProductSelection = (productId: string) => {
-    setSelectedProducts(prev => 
-      prev.includes(productId) 
+    setSelectedProducts(prev =>
+      prev.includes(productId)
         ? prev.filter(id => id !== productId)
         : [...prev, productId]
     );
@@ -234,24 +266,31 @@ const CreatePromotion = () => {
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label>Categoría</Label>
-          <Select
-            value={selectedCategory || formData.category}
-            onValueChange={(value) => {
-              setSelectedCategory(value);
-              setValue('category', value);
-            }}
-          >
-            <SelectTrigger className={errors.category ? 'border-destructive' : ''}>
-              <SelectValue placeholder="Seleccionar categoría" />
-            </SelectTrigger>
-            <SelectContent>
-              {categories.map((category) => (
-                <SelectItem key={category.value} value={category.value}>
-                  {category.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {categoriesLoading ? (
+            <div className="flex items-center justify-center p-4">
+              <Loader2 className="h-6 w-6 animate-spin" />
+            </div>
+          ) : (
+            <Select
+              value={selectedCategory || formData.category}
+              onValueChange={(value) => {
+                setSelectedCategory(value);
+                setValue('category', value);
+                setSelectedProducts([]);
+              }}
+            >
+              <SelectTrigger className={errors.category ? 'border-destructive' : ''}>
+                <SelectValue placeholder="Seleccionar categoría" />
+              </SelectTrigger>
+              <SelectContent>
+                {categoriesData?.categories.map((category) => (
+                  <SelectItem key={category.categoryId} value={category.categoryId.toString()}>
+                    {category.categoryName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
           {errors.category && (
             <p className="text-sm text-destructive">{errors.category.message}</p>
           )}
@@ -283,9 +322,10 @@ const CreatePromotion = () => {
         >
           Cancelar
         </Button>
-        <Button 
-          type="submit" 
+        <Button
+          type="submit"
           className="flex-1"
+          disabled={categoriesLoading || userLoading}
         >
           Siguiente
         </Button>
@@ -294,8 +334,8 @@ const CreatePromotion = () => {
   );
 
   const renderStep2 = () => {
-    const categoryProducts = productsByCategory[formData.category || selectedCategory] || [];
-    
+    const categoryProducts = productsData?.productsByCategory || [];
+
     return (
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         <div className="space-y-4">
@@ -312,41 +352,52 @@ const CreatePromotion = () => {
             <div>
               <h3 className="text-lg font-semibold text-primary">Seleccionar Productos</h3>
               <p className="text-sm text-muted-foreground">
-                Categoría: {categories.find(c => c.value === (formData.category || selectedCategory))?.label}
+                Categoría: {categoriesData?.categories.find(c => c.categoryId.toString() === (formData.category || selectedCategory))?.categoryName}
               </p>
             </div>
           </div>
-          
-          <div className="grid gap-4">
-            {categoryProducts.map((product) => (
-              <Card 
-                key={product.id} 
-                className={`p-4 cursor-pointer transition-colors ${
-                  selectedProducts.includes(product.id) 
-                    ? 'bg-accent border-primary' 
-                    : 'hover:bg-accent/50'
-                }`}
-                onClick={() => toggleProductSelection(product.id)}
-              >
-                <div className="flex items-center gap-3">
-                  <div onClick={(e) => e.stopPropagation()}>
-                    <Checkbox
-                      checked={selectedProducts.includes(product.id)}
-                      onCheckedChange={() => toggleProductSelection(product.id)}
-                      className="h-5 w-5"
-                    />
+
+          {productsLoading ? (
+            <div className="flex items-center justify-center p-8">
+              <Loader2 className="h-8 w-8 animate-spin" />
+            </div>
+          ) : categoryProducts.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-muted-foreground">No hay productos disponibles en esta categoría</p>
+            </div>
+          ) : (
+            <div className="grid gap-4">
+              {categoryProducts.map((product) => (
+                <Card
+                  key={product.productId}
+                  className={`p-4 cursor-pointer transition-colors ${selectedProducts.includes(product.productId.toString())
+                      ? 'bg-accent border-primary'
+                      : 'hover:bg-accent/50'
+                    }`}
+                  onClick={() => toggleProductSelection(product.productId.toString())}
+                >
+                  <div className="flex items-center gap-3">
+                    <div onClick={(e) => e.stopPropagation()}>
+                      <Checkbox
+                        checked={selectedProducts.includes(product.productId.toString())}
+                        onCheckedChange={() => toggleProductSelection(product.productId.toString())}
+                        className="h-5 w-5"
+                      />
+                    </div>
+                    <Package size={20} className="text-muted-foreground" />
+                    <div className="flex-1">
+                      <h4 className="font-medium">{product.productName}</h4>
+                      <p className="text-sm text-muted-foreground">
+                        ${product.basePrice.toFixed(2)} - SKU: {product.sku}
+                      </p>
+                    </div>
                   </div>
-                  <Package size={20} className="text-muted-foreground" />
-                  <div className="flex-1">
-                    <h4 className="font-medium">{product.name}</h4>
-                    <p className="text-sm text-muted-foreground">${product.price}</p>
-                  </div>
-                </div>
-              </Card>
-            ))}
-          </div>
-          
-          {selectedProducts.length === 0 && (
+                </Card>
+              ))}
+            </div>
+          )}
+
+          {selectedProducts.length === 0 && !productsLoading && categoryProducts.length > 0 && (
             <p className="text-sm text-muted-foreground text-center py-4">
               Selecciona al menos un producto para continuar
             </p>
@@ -362,12 +413,19 @@ const CreatePromotion = () => {
           >
             Anterior
           </Button>
-          <Button 
-            type="submit" 
+          <Button
+            type="submit"
             className="flex-1"
-            disabled={loading || selectedProducts.length === 0}
+            disabled={createLoading || associateLoading || selectedProducts.length === 0}
           >
-            {loading ? 'Guardando...' : 'Guardar'}
+            {(createLoading || associateLoading) ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Guardando...
+              </>
+            ) : (
+              'Guardar'
+            )}
           </Button>
         </div>
       </form>

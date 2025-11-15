@@ -33,6 +33,21 @@ export interface PromotionsResponse {
   promotions: Promotion[];
 }
 
+export interface CreatePromotionInput {
+  promotionName: string;
+  description?: string;
+  startDate: string;
+  endDate: string;
+  discountPercentage: number;
+  statusId: string;
+  userId?: number;
+  categoryId?: number;
+}
+
+export interface CreatePromotionResponse {
+  createPromotion: Promotion;
+}
+
 export interface UpdatePromotionInput {
   promotionName: string;
   description: string;
@@ -51,6 +66,39 @@ export interface UpdatePromotionResponse {
 export const GET_PROMOTIONS = gql`
   query Promotions {
     promotions {
+      promotionId
+      promotionName
+      description
+      startDate
+      endDate
+      discountPercentage
+      status {
+        statusId
+        statusName
+      }
+      user {
+        userId
+        userName
+        email
+      }
+      category {
+        categoryId
+        categoryName
+        description
+      }
+      products {
+        productId
+        productName
+        basePrice
+        sku
+      }
+    }
+  }
+`;
+
+export const CREATE_PROMOTION = gql`
+  mutation CreatePromotion($input: PromotionInput!) {
+    createPromotion(input: $input) {
       promotionId
       promotionName
       description

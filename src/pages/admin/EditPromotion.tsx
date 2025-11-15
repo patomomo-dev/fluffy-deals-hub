@@ -162,8 +162,6 @@ const EditPromotion = () => {
         userId: promotion?.user.userId ? Number(promotion.user.userId) : undefined
       };
 
-      console.log('Enviando input:', input);
-
       await updatePromotionMutation({
         variables: {
           id: id,
