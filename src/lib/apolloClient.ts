@@ -14,7 +14,7 @@ const authLink = new ApolloLink((operation, forward) => {
 });
 
 const httpLink = new HttpLink({
-    uri: 'https://petstore-feature5-backend.onrender.com',
+    uri: 'https://petstore-feature5-backend.onrender.com/graphql',
     credentials: 'include',
 });
 
