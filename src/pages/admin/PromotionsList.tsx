@@ -1,12 +1,24 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, Eye, Edit, Trash2, RotateCcw, XCircle } from 'lucide-react';
+import { useMutation, useQuery } from '@apollo/client/react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Layout } from '@/components/layout/Layout';
 import { useToast } from '@/hooks/use-toast';
 import { DeletePromotionDialog } from '@/components/DeletePromotionDialog';
 import { PromotionFilters, PromotionStatus } from '@/components/PromotionFilters';
+import { usePromotionFilters } from '@/hooks/usePromotionsFilter';
+import {
+  DELETE_PROMOTION,
+  RESTORE_PROMOTION,
+  PERMANENTLY_DELETE_PROMOTION,
+  type Promotion,
+  type PromotionDeleted,
+  type DeletePromotionResponse,
+  type RestorePromotionResponse,
+  type PermanentDeletePromotionResponse
+} from '@/services/promotionService';
 import storeLogo from '@/assets/PetStore-Logo.png';
 import foodPromotions from '@/assets/food-promotions.png';
 import hygienePromotions from '@/assets/hygiene-promotions.png';
@@ -18,16 +30,21 @@ import aquariumPromotions from '@/assets/aquarium-promotions.png';
 import trainPromotions from '@/assets/train-promotions.png';
 import breedingPromotions from '@/assets/breeding-promotions.png';
 import accessoriesPromotions from '@/assets/accessories-promotions.png';
-import { useQuery } from '@apollo/client/react';
-import { GET_PROMOTIONS, PromotionsResponse } from '@/services/promotionService';
+import { GET_CURRENT_USER, type CurrentUserResponse } from '@/services/authService';
 
 const PromotionsList = () => {
   const { toast } = useToast();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedPromotion, setSelectedPromotion] = useState<{ id: string; name: string } | null>(null);
-  const [filter, setFilter] = useState<PromotionStatus>('all');
+  const [filter, setFilter] = useState<PromotionStatus>('ALL');
 
-  const { data, loading, error, refetch } = useQuery<PromotionsResponse>(GET_PROMOTIONS);
+  const { promotions, loading, error, refetch } = usePromotionFilters(filter);
+
+  const { data: currentUserData } = useQuery<CurrentUserResponse>(GET_CURRENT_USER);
+
+  const [deletePromotion, { loading: deleting }] = useMutation<DeletePromotionResponse>(DELETE_PROMOTION);
+  const [restorePromotion, { loading: restoring }] = useMutation<RestorePromotionResponse>(RESTORE_PROMOTION);
+  const [permanentlyDeletePromotion, { loading: permanentDeleting }] = useMutation<PermanentDeletePromotionResponse>(PERMANENTLY_DELETE_PROMOTION);
 
   const getPromotionImage = (categoryName: string) => {
     const images: Record<string, string> = {
@@ -54,67 +71,112 @@ const PromotionsList = () => {
     });
   };
 
-  const getPromotionStatus = (promotion: { startDate: string; endDate: string; status: { statusName: string } }): PromotionStatus => {
-    const statusName = promotion.status.statusName.toLowerCase();
-
-    if (statusName.includes('inactive') || statusName.includes('expired')) return 'trash';
-
-    const now = new Date();
-    const start = new Date(promotion.startDate);
-    const end = new Date(promotion.endDate);
-
-    if (now < start) return 'scheduled';
-    if (now > end) return 'expired';
-    return 'active';
+  //REVISAR
+  const isDeletedPromotion = (promo: Promotion | PromotionDeleted): promo is PromotionDeleted => {
+    return 'deletedAt' in promo;
   };
 
-  const filteredPromotions = data?.promotions.filter(promo => {
-    const status = getPromotionStatus(promo);
-
-    if (filter === 'all') return status !== 'trash';
-    if (filter === 'trash') return status === 'trash';
-    return status === filter;
-  }) || [];
-
+  //REVISAR
   const handleDeleteClick = (id: string, name: string) => {
     setSelectedPromotion({ id, name });
     setDeleteDialogOpen(true);
   };
 
-  const handleDeleteConfirm = () => {
-    if (selectedPromotion) {
-      //Implement delete logic here
-      toast({
-        title: "Promoción eliminada",
-        description: "La promoción se ha movido a la papelera",
+  //REVISAR
+  const handleDeleteConfirm = async () => {
+    if (!selectedPromotion) return;
+
+    try {
+      if (!currentUserData?.currentUser?.userId) {
+        toast({
+          title: "Error",
+          description: "No se pudo obtener la información del usuario. Por favor, inicia sesión nuevamente.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const { data: deleteData } = await deletePromotion({
+        variables: {
+          id: selectedPromotion.id,
+          userId: Number(currentUserData.currentUser.userId)
+        }
       });
-      setDeleteDialogOpen(false);
-      setSelectedPromotion(null);
-      refetch();
+
+      if (deleteData?.deletePromotion) {
+        toast({
+          title: "Promoción eliminada",
+          description: "La promoción se ha movido a la papelera",
+        });
+        setDeleteDialogOpen(false);
+        setSelectedPromotion(null);
+        refetch();
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "No se pudo eliminar la promoción",
+        variant: "destructive"
+      });
     }
   };
 
-  const handlePermanentDelete = (id: string, name: string) => {
-    if (confirm(`¿Está seguro de eliminar permanentemente "${name}"? Esta acción no se puede deshacer.`)) {
-      //Implement permanent delete logic here
-      toast({
-        title: "Promoción eliminada permanentemente",
-        description: "La promoción ha sido eliminada completamente",
+  //REVISAR
+  const handlePermanentDelete = async (id: string, name: string) => {
+    if (!confirm(`¿Está seguro de eliminar permanentemente "${name}"? Esta acción no se puede deshacer.`)) {
+      return;
+    }
+
+    try {
+      const { data: deleteData } = await permanentlyDeletePromotion({
+        variables: {
+          id,
+          userId: Number(currentUserData.currentUser.userId)
+        }
       });
-      refetch();
+
+      if (deleteData?.permanentDeletePromotion) {
+        toast({
+          title: "Promoción eliminada permanentemente",
+          description: "La promoción ha sido eliminada completamente del sistema",
+        });
+        refetch();
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "No se pudo eliminar permanentemente la promoción",
+        variant: "destructive"
+      });
     }
   };
 
-  const handleRestore = (id: string) => {
-    //Implement restore logic here
-    toast({
-      title: "Promoción restaurada",
-      description: "La promoción ha sido restaurada exitosamente",
-    });
-    refetch();
+  const handleRestore = async (id: string) => {
+    try {
+      const { data: restoreData } = await restorePromotion({
+        variables: {
+          id,
+          userId: Number(currentUserData.currentUser.userId)
+        }
+      });
+
+      if (restoreData?.restorePromotion) {
+        toast({
+          title: "Promoción restaurada",
+          description: "La promoción ha sido restaurada exitosamente",
+        });
+        refetch();
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "No se pudo restaurar la promoción",
+        variant: "destructive"
+      });
+    }
   };
 
-  const isTrashView = filter === 'trash';
+  const isTrashView = filter === 'TRASH';
 
   if (loading) {
     return (
@@ -168,7 +230,7 @@ const PromotionsList = () => {
             {isTrashView && (
               <Button
                 variant="outline"
-                onClick={() => setFilter('all')}
+                onClick={() => setFilter('ALL')}
                 className="flex items-center gap-2"
               >
                 <XCircle size={20} />
@@ -177,105 +239,141 @@ const PromotionsList = () => {
             )}
           </div>
 
-          {filteredPromotions.length === 0 ? (
+          {promotions.length === 0 ? (
             <Card className="p-12 text-center">
-              <p className="text-muted-foreground">
+              <p className="text-muted-foreground text-lg">
                 {isTrashView
                   ? 'No hay promociones en la papelera'
-                  : 'No hay promociones disponibles'}
+                  : filter === 'ACTIVE'
+                    ? 'No hay promociones activas en este momento'
+                    : filter === 'SCHEDULE'
+                      ? 'No hay promociones programadas'
+                      : filter === 'EXPIRED'
+                        ? 'No hay promociones vencidas'
+                        : 'No hay promociones disponibles'}
               </p>
+              {filter === 'ACTIVE' && (
+                <p className="text-muted-foreground text-sm mt-2">
+                  Las promociones activas son aquellas cuya fecha de inicio ya llegó y aún no han expirado.
+                </p>
+              )}
             </Card>
           ) : (
             <div className="space-y-4">
-              {filteredPromotions.map((promotion) => (
-                <Card
-                  key={promotion.promotionId}
-                  className="overflow-hidden hover:shadow-lg transition-shadow"
-                >
-                  <div className="flex flex-col md:flex-row">
-                    <div className="md:w-48 h-48 md:h-auto bg-custom-beige">
-                      <img
-                        src={getPromotionImage(promotion.category.categoryName)}
-                        alt={promotion.promotionName}
-                        className="w-full h-full object-contain"
-                      />
-                    </div>
+              {promotions.map((promotion) => {
+                const isDeleted = isDeletedPromotion(promotion);
 
-                    <div className="flex-1 p-6 flex flex-col justify-between">
-                      <div>
-                        <div className="flex items-start justify-between mb-2">
-                          <h3 className="text-xl font-semibold text-primary">
-                            {promotion.promotionName}
-                          </h3>
-                          <span className="bg-success text-success-foreground px-3 py-1 rounded-full text-sm font-medium">
-                            {promotion.discountPercentage}% OFF
-                          </span>
-                        </div>
+                return (
+                  <Card
+                    key={promotion.promotionId}
+                    className="overflow-hidden hover:shadow-lg transition-shadow"
+                  >
+                    <div className="flex flex-col md:flex-row">
+                      <div className="md:w-48 h-48 md:h-auto bg-custom-beige">
+                        <img
+                          src={getPromotionImage(promotion.category.categoryName)}
+                          alt={promotion.promotionName}
+                          className="w-full h-full object-contain"
+                        />
+                      </div>
 
-                        <p className="text-muted-foreground mb-4">
-                          {promotion.description}
-                        </p>
+                      <div className="flex-1 p-6 flex flex-col justify-between">
+                        <div>
+                          <div className="flex items-start justify-between mb-2">
+                            <h3 className="text-xl font-semibold text-primary">
+                              {promotion.promotionName}
+                            </h3>
+                            <span className="bg-success text-success-foreground px-3 py-1 rounded-full text-sm font-medium">
+                              {promotion.discountPercentage}% OFF
+                            </span>
+                          </div>
 
-                        <div className="space-y-1 text-sm text-muted-foreground">
-                          <p>
-                            Vigencia: {formatDate(promotion.startDate)} - {formatDate(promotion.endDate)}
+                          <p className="text-muted-foreground mb-4">
+                            {promotion.description || 'Sin descripción'}
                           </p>
-                          <p>Categoría: {promotion.category.categoryName}</p>
-                          <p>Productos: {promotion.products.length}</p>
-                          <p>Estado: {promotion.status.statusName}</p>
+
+                          <div className="space-y-1 text-sm text-muted-foreground">
+                            <p>
+                              Vigencia: {formatDate(promotion.startDate)} - {formatDate(promotion.endDate)}
+                            </p>
+                            <p>Categoría: {promotion.category.categoryName}</p>
+                            {!isDeleted && 'products' in promotion && (
+                              <p>Productos: {promotion.products?.length || 0}</p>
+                            )}
+                            <p>Estado: {promotion.status.statusName}</p>
+
+                            {isDeleted && (
+                              <>
+                                <p className="text-destructive font-medium pt-2">
+                                  📅 Eliminada: {formatDate(promotion.deletedAt)}
+                                </p>
+                                <p className="text-destructive">
+                                  ⏰ Se eliminará permanentemente en {promotion.daysUntilPurge} días
+                                </p>
+                                {promotion.deletedBy && (
+                                  <p className="text-muted-foreground">
+                                    Eliminada por: {promotion.deletedBy.userName}
+                                  </p>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex gap-2 mt-4">
+                          {!isTrashView ? (
+                            <>
+                              <Button variant="outline" size="sm" className="flex items-center gap-1">
+                                <Eye size={16} />
+                                Ver
+                              </Button>
+                              <Link to={`/admin/promotions/${promotion.promotionId}/edit`}>
+                                <Button variant="outline" size="sm" className="flex items-center gap-1">
+                                  <Edit size={16} />
+                                  Editar
+                                </Button>
+                              </Link>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="flex items-center gap-1 text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                                onClick={() => handleDeleteClick(promotion.promotionId, promotion.promotionName)}
+                                disabled={deleting}
+                              >
+                                <Trash2 size={16} />
+                                {deleting ? 'Eliminando...' : 'Eliminar'}
+                              </Button>
+                            </>
+                          ) : (
+                            <>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="flex items-center gap-1 text-success hover:bg-success hover:text-success-foreground"
+                                onClick={() => handleRestore(promotion.promotionId)}
+                                disabled={restoring}
+                              >
+                                <RotateCcw size={16} />
+                                {restoring ? 'Restaurando...' : 'Restaurar'}
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="flex items-center gap-1 text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                                onClick={() => handlePermanentDelete(promotion.promotionId, promotion.promotionName)}
+                                disabled={permanentDeleting}
+                              >
+                                <Trash2 size={16} />
+                                {permanentDeleting ? 'Eliminando...' : 'Eliminar permanentemente'}
+                              </Button>
+                            </>
+                          )}
                         </div>
                       </div>
-
-                      <div className="flex gap-2 mt-4">
-                        {!isTrashView ? (
-                          <>
-                            <Button variant="outline" size="sm" className="flex items-center gap-1">
-                              <Eye size={16} />
-                              Ver
-                            </Button>
-                            <Link to={`/admin/promotions/${promotion.promotionId}/edit`}>
-                              <Button variant="outline" size="sm" className="flex items-center gap-1">
-                                <Edit size={16} />
-                                Editar
-                              </Button>
-                            </Link>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="flex items-center gap-1 text-destructive hover:bg-destructive hover:text-destructive-foreground"
-                              onClick={() => handleDeleteClick(promotion.promotionId, promotion.promotionName)}
-                            >
-                              <Trash2 size={16} />
-                              Eliminar
-                            </Button>
-                          </>
-                        ) : (
-                          <>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="flex items-center gap-1 text-success hover:bg-success hover:text-success-foreground"
-                              onClick={() => handleRestore(promotion.promotionId)}
-                            >
-                              <RotateCcw size={16} />
-                              Restaurar
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="flex items-center gap-1 text-destructive hover:bg-destructive hover:text-destructive-foreground"
-                              onClick={() => handlePermanentDelete(promotion.promotionId, promotion.promotionName)}
-                            >
-                              <Trash2 size={16} />
-                              Eliminar permanentemente
-                            </Button>
-                          </>
-                        )}
-                      </div>
                     </div>
-                  </div>
-                </Card>
-              ))}
+                  </Card>
+                );
+              })}
             </div>
           )}
         </div>
