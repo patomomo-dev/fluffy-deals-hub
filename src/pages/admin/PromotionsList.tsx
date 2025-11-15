@@ -213,7 +213,7 @@ const PromotionsList = () => {
                             {promotion.promotionName}
                           </h3>
                           <span className="bg-success text-success-foreground px-3 py-1 rounded-full text-sm font-medium">
-                            {promotion.discountValue}% OFF
+                            {promotion.discountPercentage}% OFF
                           </span>
                         </div>
 

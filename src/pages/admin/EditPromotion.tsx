@@ -11,9 +11,22 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Layout } from '@/components/layout/Layout';
-import { usePromotions } from '@/hooks/usePromotions';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Package } from 'lucide-react';
+import { useQuery, useMutation, useLazyQuery } from '@apollo/client/react';
+import {
+  GET_PROMOTIONS,
+  UPDATE_PROMOTION,
+  ASSOCIATE_PRODUCTS_TO_PROMOTION,
+  REMOVE_PRODUCTS_FROM_PROMOTION,
+  GET_CATEGORIES,
+  GET_PRODUCTS_BY_CATEGORY,
+  PromotionsResponse,
+  UpdatePromotionResponse,
+  UpdatePromotionInput,
+  CategoriesResponse,
+  ProductsByCategoryResponse
+} from '@/services/promotionService';
 
 const promotionSchema = z.object({
   name: z.string().min(1, 'Nombre requerido'),
@@ -42,52 +55,26 @@ const promotionSchema = z.object({
 
 type PromotionForm = z.infer<typeof promotionSchema>;
 
-const categories = [
-  { value: 'alimento', label: 'Alimento' },
-  { value: 'juguetes', label: 'Juguetes' },
-  { value: 'cuidado', label: 'Cuidado e Higiene' },
-  { value: 'accesorios', label: 'Accesorios' },
-];
-
-const productsByCategory: Record<string, Array<{id: string, name: string, price: number}>> = {
-  alimento: [
-    { id: '1', name: 'Alimento Premium para Perros', price: 45.99 },
-    { id: '2', name: 'Alimento para Gatos Adultos', price: 32.50 },
-    { id: '3', name: 'Snacks Naturales', price: 15.75 },
-    { id: '4', name: 'Alimento para Cachorros', price: 38.90 },
-  ],
-  juguetes: [
-    { id: '5', name: 'Pelota de Goma', price: 12.99 },
-    { id: '6', name: 'Rascador para Gatos', price: 89.99 },
-    { id: '7', name: 'Cuerda para Perros', price: 18.50 },
-    { id: '8', name: 'Ratón de Peluche', price: 8.75 },
-  ],
-  cuidado: [
-    { id: '9', name: 'Champú para Mascotas', price: 24.99 },
-    { id: '10', name: 'Cepillo Dental', price: 16.50 },
-    { id: '11', name: 'Toallitas Húmedas', price: 12.25 },
-    { id: '12', name: 'Cortaúñas Profesional', price: 35.00 },
-  ],
-  accesorios: [
-    { id: '13', name: 'Collar Ajustable', price: 22.99 },
-    { id: '14', name: 'Correa Retráctil', price: 45.50 },
-    { id: '15', name: 'Cama Acolchada', price: 75.00 },
-    { id: '16', name: 'Bebedero Automático', price: 89.99 },
-  ],
-};
-
 const EditPromotion = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { promotions, isLoading, updatePromotion } = usePromotions();
   const { toast } = useToast();
-  const [loading, setLoading] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
+  const [initialProducts, setInitialProducts] = useState<string[]>([]);
   const [formData, setFormData] = useState<Partial<PromotionForm>>({});
+  const { data: promotionsData, loading: isLoadingPromotions } = useQuery<PromotionsResponse>(GET_PROMOTIONS);
+  const { data: categoriesData, loading: isLoadingCategories } = useQuery<CategoriesResponse>(GET_CATEGORIES);
 
-  const promotion = promotions.find(p => p.id === id);
+  const [getProductsByCategory, { data: productsData, loading: isLoadingProducts }] =
+    useLazyQuery<ProductsByCategoryResponse>(GET_PRODUCTS_BY_CATEGORY);
+
+  const [updatePromotionMutation, { loading: updating }] = useMutation<UpdatePromotionResponse>(UPDATE_PROMOTION);
+  const [associateProductsMutation] = useMutation(ASSOCIATE_PRODUCTS_TO_PROMOTION);
+  const [removeProductsMutation] = useMutation(REMOVE_PRODUCTS_FROM_PROMOTION);
+
+  const promotion = promotionsData?.promotions?.find((p) => p.promotionId === id);
 
   const {
     register,
@@ -101,30 +88,37 @@ const EditPromotion = () => {
   });
 
   useEffect(() => {
-    console.log('Promotions:', promotions);
-    console.log('Looking for ID:', id);
-    console.log('Found promotion:', promotion);
-    console.log('Is Loading:', isLoading);
-    
-    if (isLoading) return;
-    
+    if (isLoadingPromotions) return;
+
     if (promotion) {
-      setValue('name', promotion.name);
+      setValue('name', promotion.promotionName);
       setValue('description', promotion.description);
-      setValue('category', promotion.category);
-      setValue('discount', promotion.discount);
-      setValue('startDate', promotion.startDate);
-      setValue('endDate', promotion.endDate);
-      setSelectedCategory(promotion.category);
-      setSelectedProducts(promotion.selectedProducts || []);
-    } else if (id) {
+      setValue('category', promotion.category.categoryId.toString());
+      setValue('discount', promotion.discountPercentage);
+      setValue('startDate', promotion.startDate.split('T')[0]);
+      setValue('endDate', promotion.endDate.split('T')[0]);
+
+      const categoryId = promotion.category.categoryId;
+      setSelectedCategory(categoryId.toString());
+
+      getProductsByCategory({
+        variables: { categoryId: categoryId }
+      });
+
+      if (promotion.products && promotion.products.length > 0) {
+        const productIds = promotion.products.map((p) => p.productId.toString());
+        setSelectedProducts(productIds);
+        setInitialProducts(productIds);
+      }
+
+    } else if (id && promotionsData?.promotions) {
       toast({
         title: "Promoción no encontrada",
         variant: "destructive",
       });
       navigate('/admin/promotions');
     }
-  }, [promotion, id, navigate, setValue, toast, isLoading]);
+  }, [promotion, id, navigate, setValue, toast, isLoadingPromotions, promotionsData, getProductsByCategory]);
 
   const handleNextStep = async () => {
     const isValid = await trigger(['name', 'description', 'category', 'discount', 'startDate', 'endDate']);
@@ -154,52 +148,83 @@ const EditPromotion = () => {
       return;
     }
 
-    setLoading(true);
-    
     try {
-      const imageMap: Record<string, string> = {
-        'alimento': 'dog-products',
-        'juguetes': 'cat-products',
-        'cuidado': 'dog-products',
-        'accesorios': 'cat-products',
+      const currentFormData = getValues();
+
+      const input: UpdatePromotionInput = {
+        promotionName: currentFormData.name,
+        description: currentFormData.description,
+        categoryId: parseInt(currentFormData.category),
+        discountPercentage: Number(currentFormData.discount),
+        startDate: currentFormData.startDate,
+        endDate: currentFormData.endDate,
+        statusId: promotion?.status.statusId || '1',
+        userId: promotion?.user.userId ? Number(promotion.user.userId) : undefined
       };
 
-      if (id) {
-        updatePromotion(id, {
-          name: formData.name || data.name,
-          description: formData.description || data.description,
-          category: formData.category || data.category,
-          discount: formData.discount || data.discount,
-          startDate: formData.startDate || data.startDate,
-          endDate: formData.endDate || data.endDate,
-          image: imageMap[formData.category || data.category] || 'dog-products',
-          selectedProducts: selectedProducts,
-        });
+      console.log('Enviando input:', input);
 
-        toast({
-          title: "Promoción actualizada",
-          description: "La promoción se ha actualizado exitosamente",
+      await updatePromotionMutation({
+        variables: {
+          id: id,
+          input: input
+        }
+      });
+
+      const removedProducts = initialProducts.filter(
+        (initialId) => !selectedProducts.includes(initialId)
+      );
+
+      if (removedProducts.length > 0) {
+        await removeProductsMutation({
+          variables: {
+            promotionId: id,
+            productIds: removedProducts
+          }
         });
-        
-        navigate('/admin/promotions');
       }
+
+      await associateProductsMutation({
+        variables: {
+          promotionId: id,
+          productIds: selectedProducts
+        },
+        refetchQueries: [{ query: GET_PROMOTIONS }],
+      });
+
+      toast({
+        title: "Promoción actualizada",
+        description: "La promoción se ha actualizado exitosamente",
+      });
+
+      navigate('/admin/promotions');
+
     } catch (error) {
+      console.error('Error updating promotion:', error);
       toast({
         title: "Error",
         description: "Ocurrió un error al actualizar la promoción",
         variant: "destructive",
       });
-    } finally {
-      setLoading(false);
     }
   };
 
   const toggleProductSelection = (productId: string) => {
-    setSelectedProducts(prev => 
-      prev.includes(productId) 
+    setSelectedProducts(prev =>
+      prev.includes(productId)
         ? prev.filter(id => id !== productId)
         : [...prev, productId]
     );
+  };
+
+  const handleCategoryChange = (value: string) => {
+    setSelectedCategory(value);
+    setValue('category', value);
+    setSelectedProducts([]);
+
+    getProductsByCategory({
+      variables: { categoryId: value }
+    });
   };
 
   const renderStep1 = () => (
@@ -262,20 +287,21 @@ const EditPromotion = () => {
           <Label>Categoría</Label>
           <Select
             value={selectedCategory}
-            onValueChange={(value) => {
-              setSelectedCategory(value);
-              setValue('category', value);
-            }}
+            onValueChange={handleCategoryChange}
           >
             <SelectTrigger className={errors.category ? 'border-destructive' : ''}>
               <SelectValue placeholder="Seleccionar categoría" />
             </SelectTrigger>
             <SelectContent>
-              {categories.map((category) => (
-                <SelectItem key={category.value} value={category.value}>
-                  {category.label}
-                </SelectItem>
-              ))}
+              {isLoadingCategories ? (
+                <SelectItem value="loading" disabled>Cargando...</SelectItem>
+              ) : (
+                categoriesData?.categories?.map((category) => (
+                  <SelectItem key={category.categoryId} value={category.categoryId.toString()}>
+                    {category.categoryName}
+                  </SelectItem>
+                ))
+              )}
             </SelectContent>
           </Select>
           {errors.category && (
@@ -308,8 +334,8 @@ const EditPromotion = () => {
         >
           Cancelar
         </Button>
-        <Button 
-          type="submit" 
+        <Button
+          type="submit"
           className="flex-1"
         >
           Siguiente
@@ -319,8 +345,11 @@ const EditPromotion = () => {
   );
 
   const renderStep2 = () => {
-    const categoryProducts = productsByCategory[selectedCategory] || [];
-    
+    const categoryProducts = productsData?.productsByCategory || [];
+    const selectedCategoryName = categoriesData?.categories?.find(
+      c => c.categoryId.toString() === selectedCategory
+    )?.categoryName;
+
     return (
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         <div className="space-y-4">
@@ -337,41 +366,52 @@ const EditPromotion = () => {
             <div>
               <h3 className="text-lg font-semibold text-primary">Seleccionar Productos</h3>
               <p className="text-sm text-muted-foreground">
-                Categoría: {categories.find(c => c.value === selectedCategory)?.label}
+                Categoría: {selectedCategoryName || 'Cargando...'}
               </p>
             </div>
           </div>
-          
-          <div className="grid gap-4">
-            {categoryProducts.map((product) => (
-              <Card 
-                key={product.id} 
-                className={`p-4 cursor-pointer transition-colors ${
-                  selectedProducts.includes(product.id) 
-                    ? 'bg-accent border-primary' 
+
+          {isLoadingProducts ? (
+            <div className="text-center py-8">
+              <p className="text-muted-foreground">Cargando productos...</p>
+            </div>
+          ) : categoryProducts.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-muted-foreground">No hay productos disponibles en esta categoría</p>
+            </div>
+          ) : (
+            <div className="grid gap-4">
+              {categoryProducts.map((product) => (
+                <Card
+                  key={product.productId}
+                  className={`p-4 cursor-pointer transition-colors ${selectedProducts.includes(product.productId.toString())
+                    ? 'bg-accent border-primary'
                     : 'hover:bg-accent/50'
-                }`}
-                onClick={() => toggleProductSelection(product.id)}
-              >
-                <div className="flex items-center gap-3">
-                  <div onClick={(e) => e.stopPropagation()}>
-                    <Checkbox
-                      checked={selectedProducts.includes(product.id)}
-                      onCheckedChange={() => toggleProductSelection(product.id)}
-                      className="h-5 w-5"
-                    />
+                    }`}
+                  onClick={() => toggleProductSelection(product.productId.toString())}
+                >
+                  <div className="flex items-center gap-3">
+                    <div onClick={(e) => e.stopPropagation()}>
+                      <Checkbox
+                        checked={selectedProducts.includes(product.productId.toString())}
+                        onCheckedChange={() => toggleProductSelection(product.productId.toString())}
+                        className="h-5 w-5"
+                      />
+                    </div>
+                    <Package size={20} className="text-muted-foreground" />
+                    <div className="flex-1">
+                      <h4 className="font-medium">{product.productName}</h4>
+                      <p className="text-sm text-muted-foreground">
+                        ${product.basePrice.toFixed(2)} - SKU: {product.sku}
+                      </p>
+                    </div>
                   </div>
-                  <Package size={20} className="text-muted-foreground" />
-                  <div className="flex-1">
-                    <h4 className="font-medium">{product.name}</h4>
-                    <p className="text-sm text-muted-foreground">${product.price}</p>
-                  </div>
-                </div>
-              </Card>
-            ))}
-          </div>
-          
-          {selectedProducts.length === 0 && (
+                </Card>
+              ))}
+            </div>
+          )}
+
+          {selectedProducts.length === 0 && !isLoadingProducts && categoryProducts.length > 0 && (
             <p className="text-sm text-muted-foreground text-center py-4">
               Selecciona al menos un producto para continuar
             </p>
@@ -387,19 +427,19 @@ const EditPromotion = () => {
           >
             Anterior
           </Button>
-          <Button 
-            type="submit" 
+          <Button
+            type="submit"
             className="flex-1"
-            disabled={loading || selectedProducts.length === 0}
+            disabled={updating || selectedProducts.length === 0}
           >
-            {loading ? 'Guardando...' : 'Guardar'}
+            {updating ? 'Guardando...' : 'Guardar'}
           </Button>
         </div>
       </form>
     );
   };
 
-  if (isLoading) {
+  if (isLoadingPromotions || isLoadingCategories) {
     return (
       <Layout>
         <div className="container mx-auto px-6 py-8">
@@ -411,7 +451,7 @@ const EditPromotion = () => {
     );
   }
 
-  if (!promotion) {
+  if (!promotion && !isLoadingPromotions) {
     return null;
   }
 

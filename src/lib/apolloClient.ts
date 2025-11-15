@@ -3,11 +3,12 @@ import { ApolloClient, InMemoryCache, HttpLink, ApolloLink } from '@apollo/clien
 const authLink = new ApolloLink((operation, forward) => {
     const token = localStorage.getItem('token');
 
-    operation.setContext({
+    operation.setContext(({ headers = {} }) => ({
         headers: {
-            authorization: token ? `Bearer ${token}` : '',
-        }
-    });
+            ...headers,
+            Authorization: token ? `Bearer ${token}` : "",
+        },
+    }));
 
     return forward(operation);
 });
