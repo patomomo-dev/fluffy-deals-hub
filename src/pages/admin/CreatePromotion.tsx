@@ -1,9 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { useMutation, useQuery } from '@apollo/client/react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,438 +11,151 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Layout } from '@/components/layout/Layout';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Package, Loader2 } from 'lucide-react';
-import {
-  CREATE_PROMOTION,
-  ASSOCIATE_PRODUCTS_TO_PROMOTION,
-  GET_CATEGORIES,
-  GET_PRODUCTS_BY_CATEGORY,
-  GET_PROMOTIONS,
-  type CategoriesResponse,
-  type ProductsByCategoryResponse,
-  type CreatePromotionResponse,
-  type CreatePromotionInput,
-} from '@/services/promotionService';
-import { GET_CURRENT_USER, type CurrentUserResponse } from '@/services/authService';
-
-const promotionSchema = z.object({
-  name: z.string().min(1, 'Nombre requerido'),
-  description: z.string().min(1, 'Descripción requerida'),
-  category: z.string().min(1, 'Categoría requerida'),
-  discount: z.coerce.number().min(1, 'Descuento debe ser mayor a 0').max(100, 'Descuento no puede ser mayor a 100'),
-  startDate: z.string().min(1, 'Fecha de inicio requerida'),
-  endDate: z.string().min(1, 'Fecha de fin requerida'),
-}).refine((data) => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const startDate = new Date(data.startDate + 'T00:00:00');
-  startDate.setHours(0, 0, 0, 0);
-  return startDate >= today;
-}, {
-  message: 'La fecha de inicio no puede ser anterior a hoy',
-  path: ['startDate'],
-}).refine((data) => {
-  const startDate = new Date(data.startDate);
-  const endDate = new Date(data.endDate);
-  return endDate >= startDate;
-}, {
-  message: 'La fecha de fin debe ser igual o posterior a la fecha de inicio',
-  path: ['endDate'],
-});
-
-type PromotionForm = z.infer<typeof promotionSchema>;
+import { ArrowLeft, Loader2 } from 'lucide-react';
+import { promotionService } from '@/services/promotionService';
+import { promotionSchema, type PromotionFormData } from '@/lib/validators/promotionSchema';
 
 const CreatePromotion = () => {
   const [currentStep, setCurrentStep] = useState(1);
-  const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
-  const [formData, setFormData] = useState<Partial<PromotionForm>>({});
+  const [formData, setFormData] = useState<PromotionFormData | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-    setValue,
-    trigger,
-    getValues,
-  } = useForm<PromotionForm>({
+  const { register, handleSubmit, formState: { errors }, setValue, watch } = useForm<PromotionFormData>({
     resolver: zodResolver(promotionSchema),
   });
 
-  const { data: categoriesData, loading: categoriesLoading } = useQuery<CategoriesResponse>(GET_CATEGORIES);
-
-  const { data: currentUserData, loading: userLoading } = useQuery<CurrentUserResponse>(GET_CURRENT_USER);
-
-  const { data: productsData, loading: productsLoading } = useQuery<ProductsByCategoryResponse>(
-    GET_PRODUCTS_BY_CATEGORY,
-    {
-      variables: { categoryId: selectedCategory || formData.category },
-      skip: !selectedCategory && !formData.category,
-    }
-  );
-
-  const [createPromotion, { loading: createLoading }] = useMutation<CreatePromotionResponse>(
-    CREATE_PROMOTION,
-    {
-      refetchQueries: [{ query: GET_PROMOTIONS }],
-      onCompleted: (data) => {
-        if (selectedProducts.length > 0) {
-          associateProducts({
-            variables: {
-              promotionId: data.createPromotion.promotionId,
-              productIds: selectedProducts,
-            },
-          });
-        } else {
-          toast({
-            title: "Promoción creada",
-            description: "La promoción se ha creado exitosamente",
-          });
-          navigate('/admin/promotions');
-        }
-      },
-      onError: (error) => {
-        console.error('Error al crear promoción:', error);
-        toast({
-          title: "Error",
-          description: error.message || "Ocurrió un error al crear la promoción",
-          variant: "destructive",
-        });
-      },
-    }
-  );
-
-  const [associateProducts, { loading: associateLoading }] = useMutation(
-    ASSOCIATE_PRODUCTS_TO_PROMOTION,
-    {
-      refetchQueries: [{ query: GET_PROMOTIONS }],
-      onCompleted: () => {
-        toast({
-          title: "Promoción creada",
-          description: "La promoción y los productos se han asociado exitosamente",
-        });
-        navigate('/admin/promotions');
-      },
-      onError: (error) => {
-        console.error('Error al asociar productos:', error);
-        toast({
-          title: "Advertencia",
-          description: "La promoción se creó pero hubo un error al asociar algunos productos",
-          variant: "destructive",
-        });
-        navigate('/admin/promotions');
-      },
-    }
-  );
-
-  const handleNextStep = async () => {
-    const isValid = await trigger(['name', 'description', 'category', 'discount', 'startDate', 'endDate']);
-    if (isValid) {
-      const currentData = getValues();
-      setFormData(currentData);
-      setCurrentStep(2);
-    }
-  };
-
-  const handlePreviousStep = () => {
-    setCurrentStep(1);
-  };
-
-  const onSubmit = async (data: PromotionForm) => {
-    if (currentStep === 1) {
-      handleNextStep();
-      return;
-    }
-
-    if (selectedProducts.length === 0) {
-      toast({
-        title: "Error",
-        description: "Debe seleccionar al menos un producto",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      if (!currentUserData?.currentUser?.userId) {
-        toast({
-          title: "Error",
-          description: "No se pudo obtener la información del usuario. Por favor, inicia sesión nuevamente.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      const input: CreatePromotionInput = {
-        promotionName: formData.name || data.name,
-        description: formData.description || data.description,
-        startDate: formData.startDate || data.startDate,
-        endDate: formData.endDate || data.endDate,
-        discountPercentage: Number(formData.discount || data.discount),
-        categoryId: Number(formData.category || data.category),
-        statusId: "1",
-        userId: Number(currentUserData.currentUser.userId),
-      };
-
-      await createPromotion({
-        variables: { input },
-      });
-    } catch (error) {
-      console.error('Error en onSubmit:', error);
-    }
-  };
+  const selectedCategory = watch('category');
+  const categories = promotionService.getCategories();
+  const products = selectedCategory ? promotionService.getProductsByCategory(selectedCategory) : [];
 
   const toggleProductSelection = (productId: string) => {
-    setSelectedProducts(prev =>
-      prev.includes(productId)
-        ? prev.filter(id => id !== productId)
-        : [...prev, productId]
-    );
+    setSelectedProducts(prev => prev.includes(productId) ? prev.filter(id => id !== productId) : [...prev, productId]);
   };
 
-  const renderStep1 = () => (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-      <div className="space-y-2">
-        <Label htmlFor="name">Nombre de la promoción</Label>
-        <Input
-          id="name"
-          defaultValue={formData.name}
-          {...register('name')}
-          className={errors.name ? 'border-destructive' : ''}
-        />
-        {errors.name && (
-          <p className="text-sm text-destructive">{errors.name.message}</p>
-        )}
-      </div>
+  const handleNext = async (data: PromotionFormData) => {
+    setFormData(data);
+    setCurrentStep(2);
+  };
 
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="startDate">Fecha de inicio</Label>
-          <Input
-            id="startDate"
-            type="date"
-            defaultValue={formData.startDate}
-            {...register('startDate')}
-            className={errors.startDate ? 'border-destructive' : ''}
-          />
-          {errors.startDate && (
-            <p className="text-sm text-destructive">{errors.startDate.message}</p>
-          )}
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="endDate">Fecha de fin</Label>
-          <Input
-            id="endDate"
-            type="date"
-            defaultValue={formData.endDate}
-            {...register('endDate')}
-            className={errors.endDate ? 'border-destructive' : ''}
-          />
-          {errors.endDate && (
-            <p className="text-sm text-destructive">{errors.endDate.message}</p>
-          )}
-        </div>
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="description">Descripción</Label>
-        <Textarea
-          id="description"
-          rows={4}
-          defaultValue={formData.description}
-          {...register('description')}
-          className={errors.description ? 'border-destructive' : ''}
-        />
-        {errors.description && (
-          <p className="text-sm text-destructive">{errors.description.message}</p>
-        )}
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label>Categoría</Label>
-          {categoriesLoading ? (
-            <div className="flex items-center justify-center p-4">
-              <Loader2 className="h-6 w-6 animate-spin" />
-            </div>
-          ) : (
-            <Select
-              value={selectedCategory || formData.category}
-              onValueChange={(value) => {
-                setSelectedCategory(value);
-                setValue('category', value);
-                setSelectedProducts([]);
-              }}
-            >
-              <SelectTrigger className={errors.category ? 'border-destructive' : ''}>
-                <SelectValue placeholder="Seleccionar categoría" />
-              </SelectTrigger>
-              <SelectContent>
-                {categoriesData?.categories.map((category) => (
-                  <SelectItem key={category.categoryId} value={category.categoryId.toString()}>
-                    {category.categoryName}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-          {errors.category && (
-            <p className="text-sm text-destructive">{errors.category.message}</p>
-          )}
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="discount">Porcentaje de descuento</Label>
-          <Input
-            id="discount"
-            type="number"
-            min="1"
-            max="100"
-            defaultValue={formData.discount}
-            {...register('discount')}
-            className={errors.discount ? 'border-destructive' : ''}
-          />
-          {errors.discount && (
-            <p className="text-sm text-destructive">{errors.discount.message}</p>
-          )}
-        </div>
-      </div>
-
-      <div className="flex gap-4 pt-4">
-        <Button
-          type="button"
-          variant="cancel"
-          className="flex-1"
-          onClick={() => navigate('/admin/promotions')}
-        >
-          Cancelar
-        </Button>
-        <Button
-          type="submit"
-          className="flex-1"
-          disabled={categoriesLoading || userLoading}
-        >
-          Siguiente
-        </Button>
-      </div>
-    </form>
-  );
-
-  const renderStep2 = () => {
-    const categoryProducts = productsData?.productsByCategory || [];
-
-    return (
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-        <div className="space-y-4">
-          <div className="flex items-center gap-2 mb-4">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={handlePreviousStep}
-              className="p-2"
-            >
-              <ArrowLeft size={16} />
-            </Button>
-            <div>
-              <h3 className="text-lg font-semibold text-primary">Seleccionar Productos</h3>
-              <p className="text-sm text-muted-foreground">
-                Categoría: {categoriesData?.categories.find(c => c.categoryId.toString() === (formData.category || selectedCategory))?.categoryName}
-              </p>
-            </div>
-          </div>
-
-          {productsLoading ? (
-            <div className="flex items-center justify-center p-8">
-              <Loader2 className="h-8 w-8 animate-spin" />
-            </div>
-          ) : categoryProducts.length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-muted-foreground">No hay productos disponibles en esta categoría</p>
-            </div>
-          ) : (
-            <div className="grid gap-4">
-              {categoryProducts.map((product) => (
-                <Card
-                  key={product.productId}
-                  className={`p-4 cursor-pointer transition-colors ${selectedProducts.includes(product.productId.toString())
-                      ? 'bg-accent border-primary'
-                      : 'hover:bg-accent/50'
-                    }`}
-                  onClick={() => toggleProductSelection(product.productId.toString())}
-                >
-                  <div className="flex items-center gap-3">
-                    <div onClick={(e) => e.stopPropagation()}>
-                      <Checkbox
-                        checked={selectedProducts.includes(product.productId.toString())}
-                        onCheckedChange={() => toggleProductSelection(product.productId.toString())}
-                        className="h-5 w-5"
-                      />
-                    </div>
-                    <Package size={20} className="text-muted-foreground" />
-                    <div className="flex-1">
-                      <h4 className="font-medium">{product.productName}</h4>
-                      <p className="text-sm text-muted-foreground">
-                        ${product.basePrice.toFixed(2)} - SKU: {product.sku}
-                      </p>
-                    </div>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          )}
-
-          {selectedProducts.length === 0 && !productsLoading && categoryProducts.length > 0 && (
-            <p className="text-sm text-muted-foreground text-center py-4">
-              Selecciona al menos un producto para continuar
-            </p>
-          )}
-        </div>
-
-        <div className="flex gap-4 pt-4">
-          <Button
-            type="button"
-            variant="cancel"
-            className="flex-1"
-            onClick={handlePreviousStep}
-          >
-            Anterior
-          </Button>
-          <Button
-            type="submit"
-            className="flex-1"
-            disabled={createLoading || associateLoading || selectedProducts.length === 0}
-          >
-            {(createLoading || associateLoading) ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Guardando...
-              </>
-            ) : (
-              'Guardar'
-            )}
-          </Button>
-        </div>
-      </form>
-    );
+  const handleSave = async () => {
+    if (!formData) return;
+    setIsSaving(true);
+    try {
+      promotionService.create({ ...formData, productIds: selectedProducts });
+      toast({ title: 'Promoción creada' });
+      navigate('/admin/promotions');
+    } catch (error) {
+      toast({ title: 'Error', variant: 'destructive' });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
     <Layout>
-      <div className="container mx-auto px-6 py-8">
-        <Card className="max-w-2xl mx-auto">
-          <CardHeader>
-            <CardTitle className="text-2xl text-primary">
-              Crear Nueva Promoción - Paso {currentStep} de 2
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {currentStep === 1 ? renderStep1() : renderStep2()}
-          </CardContent>
-        </Card>
+      <div className="container mx-auto py-8 px-4">
+        <div className="flex items-center gap-4 mb-6">
+          <Button variant="ghost" size="icon" onClick={() => navigate('/admin/promotions')}>
+            <ArrowLeft size={20} />
+          </Button>
+          <h1 className="text-3xl font-bold">Crear Promoción - Paso {currentStep} de 2</h1>
+        </div>
+
+        {currentStep === 1 ? (
+          <Card className="max-w-2xl">
+            <CardContent className="pt-6">
+              <form onSubmit={handleSubmit(handleNext)} className="space-y-6">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Nombre *</Label>
+                  <Input id="name" {...register('name')} />
+                  {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="startDate">Fecha inicio *</Label>
+                    <Input id="startDate" type="date" {...register('startDate')} />
+                    {errors.startDate && <p className="text-sm text-destructive">{errors.startDate.message}</p>}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="endDate">Fecha fin *</Label>
+                    <Input id="endDate" type="date" {...register('endDate')} />
+                    {errors.endDate && <p className="text-sm text-destructive">{errors.endDate.message}</p>}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="description">Descripción *</Label>
+                  <Textarea id="description" {...register('description')} rows={4} />
+                  {errors.description && <p className="text-sm text-destructive">{errors.description.message}</p>}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="category">Categoría *</Label>
+                  <Select onValueChange={(value) => setValue('category', value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecciona" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categories.map((cat) => <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  {errors.category && <p className="text-sm text-destructive">{errors.category.message}</p>}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="discount">Descuento (%) *</Label>
+                  <Input id="discount" type="number" min="1" max="100" {...register('discount', { valueAsNumber: true })} />
+                  {errors.discount && <p className="text-sm text-destructive">{errors.discount.message}</p>}
+                </div>
+
+                <div className="flex gap-4 justify-end">
+                  <Button type="button" variant="outline" onClick={() => navigate('/admin/promotions')}>Cancelar</Button>
+                  <Button type="submit">Siguiente</Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Selecciona productos</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {products.map((product) => {
+                    const isSelected = selectedProducts.includes(product.id);
+                    return (
+                      <Card key={product.id} className={`cursor-pointer ${isSelected ? 'border-primary ring-2 ring-primary' : ''}`} onClick={() => toggleProductSelection(product.id)}>
+                        <CardContent className="p-4">
+                          <div className="flex items-start gap-3">
+                            <Checkbox checked={isSelected} onClick={(e) => e.stopPropagation()} />
+                            <div>
+                              <h3 className="font-semibold text-sm">{product.name}</h3>
+                              <p className="text-xs text-muted-foreground">{product.description}</p>
+                              <p className="text-sm font-bold text-primary mt-2">${product.price}</p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+
+            <div className="flex gap-4 justify-end">
+              <Button variant="outline" onClick={() => setCurrentStep(1)}>Atrás</Button>
+              <Button onClick={handleSave} disabled={isSaving}>
+                {isSaving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Guardando...</> : 'Guardar'}
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
     </Layout>
   );
