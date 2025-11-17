@@ -1,459 +1,224 @@
-import { gql } from '@apollo/client';
+import { v4 as uuidv4 } from 'uuid';
 
 export interface Promotion {
-  promotionId: string;
-  promotionName: string;
+  id: string;
+  name: string;
   description: string;
-  startDate: string;
-  endDate: string;
-  discountPercentage: number;
-  status: {
-    statusId: string;
-    statusName: string;
-  };
-  user: {
-    userId: number;
-    userName: string;
-    email: string;
-  };
-  category: {
-    categoryId: number;
-    categoryName: string;
-    description: string;
-  };
-  products: Array<{
-    productId: number;
-    productName: string;
-    basePrice: number;
-    sku: string;
-  }>;
-}
-
-export interface PromotionsResponse {
-  promotions: Promotion[];
-}
-
-export interface CreatePromotionInput {
-  promotionName: string;
-  description?: string;
-  startDate: string;
-  endDate: string;
-  discountPercentage: number;
-  statusId: string;
-  userId?: number;
-  categoryId?: number;
-}
-
-export interface CreatePromotionResponse {
-  createPromotion: Promotion;
-}
-
-export interface UpdatePromotionInput {
-  promotionName: string;
-  description: string;
-  startDate: string;
-  endDate: string;
-  discountPercentage: number;
-  categoryId: number;
-  statusId: string;
-  userId?: number;
-}
-
-export interface UpdatePromotionResponse {
-  updatePromotion: Promotion;
-}
-
-export const GET_PROMOTIONS = gql`
-  query Promotions {
-    promotions {
-      promotionId
-      promotionName
-      description
-      startDate
-      endDate
-      discountPercentage
-      status {
-        statusId
-        statusName
-      }
-      user {
-        userId
-        userName
-        email
-      }
-      category {
-        categoryId
-        categoryName
-        description
-      }
-      products {
-        productId
-        productName
-        basePrice
-        sku
-      }
-    }
-  }
-`;
-
-export const CREATE_PROMOTION = gql`
-  mutation CreatePromotion($input: PromotionInput!) {
-    createPromotion(input: $input) {
-      promotionId
-      promotionName
-      description
-      startDate
-      endDate
-      discountPercentage
-      status {
-        statusId
-        statusName
-      }
-      user {
-        userId
-        userName
-        email
-      }
-      category {
-        categoryId
-        categoryName
-        description
-      }
-      products {
-        productId
-        productName
-        basePrice
-        sku
-      }
-    }
-  }
-`;
-
-export const UPDATE_PROMOTION = gql`
-  mutation UpdatePromotion($id: ID!, $input: PromotionInput!) {
-    updatePromotion(id: $id, input: $input) {
-      promotionId
-      promotionName
-      description
-      startDate
-      endDate
-      discountPercentage
-      status {
-        statusId
-        statusName
-      }
-      user {
-        userId
-        userName
-        email
-      }
-      products {
-        productId
-        productName
-        basePrice
-        sku
-      }
-      category {
-        categoryId
-        categoryName
-        description
-      }
-    }
-  }
-`;
-
-//MODIFICAR
-export const DELETE_PROMOTION = gql`
-  mutation DeletePromotion($id: ID!, $userId: ID) {
-    deletePromotion(id: $id, userId: $userId)
-  }
-`;
-
-export interface DeletePromotionResponse {
-  deletePromotion: boolean;
-}
-
-//MODIFICAR
-export const RESTORE_PROMOTION = gql`
-  mutation RestorePromotion($id: ID!, $userId: ID!) {
-    restorePromotion(id: $id, userId: $userId)
-  }
-`;
-
-export interface RestorePromotionResponse {
-  restorePromotion: boolean;
-}
-
-//MODIFICAR
-export const PERMANENTLY_DELETE_PROMOTION = gql`
-  mutation PermanentDeletePromotion($id: ID!, $userId: ID!) {
-    permanentDeletePromotion(id: $id, userId: $userId)
-  }
-`;
-
-export interface PermanentDeletePromotionResponse {
-  permanentDeletePromotion: boolean;
-}
-
-export const GET_CATEGORIES = gql`
-  query Categories {
-    categories {
-      categoryId
-      categoryName
-      description
-    }
-  }
-`;
-
-export const GET_PRODUCTS_BY_CATEGORY = gql`
-  query ProductsByCategory($categoryId: ID!) {
-    productsByCategory(categoryId: $categoryId) {
-      productId
-      productName
-      basePrice
-      sku
-    }
-  }
-`;
-
-export const GET_PRODUCTS = gql`
-  query Products {
-    products {
-      productId
-      productName
-      basePrice
-      sku
-      category {
-        categoryId
-        categoryName
-      }
-    }
-  }
-`;
-
-export const ASSOCIATE_PRODUCTS_TO_PROMOTION = gql`
-  mutation AssociateProductsToPromotion($promotionId: ID!, $productIds: [ID!]!) {
-    associateProductsToPromotion(promotionId: $promotionId, productIds: $productIds) {
-      promotionId
-      promotionName
-      products {
-        productId
-        productName
-        basePrice
-        sku
-      }
-    }
-  }
-`;
-
-export const REMOVE_PRODUCTS_FROM_PROMOTION = gql`
-  mutation RemoveProductsFromPromotion($promotionId: ID!, $productIds: [ID!]!) {
-    removeProductsFromPromotion(promotionId: $promotionId, productIds: $productIds) {
-      promotionId
-      promotionName
-      products {
-        productId
-        productName
-        basePrice
-        sku
-      }
-    }
-  }
-`;
-
-export interface Category {
-  categoryId: number;
-  categoryName: string;
-  description: string;
-}
-
-export interface CategoriesResponse {
-  categories: Category[];
+  startDate: string; // ISO yyyy-mm-dd
+  endDate: string; // ISO yyyy-mm-dd
+  category: string;
+  discount: number;
+  productIds: string[];
+  active: boolean;
+  image?: string;
+  createdAt: string; // ISO
 }
 
 export interface Product {
-  productId: number;
-  productName: string;
-  basePrice: number;
-  sku: string;
-}
-
-export interface ProductsByCategoryResponse {
-  productsByCategory: Product[];
-}
-
-export const GET_ACTIVE_PROMOTIONS = gql`
-  query PromotionsActive {
-    promotionsActive {
-      promotionId
-      promotionName
-      description
-      startDate
-      endDate
-      discountPercentage
-      status {
-        statusId
-        statusName
-      }
-      user {
-        userId
-        userName
-        email
-      }
-      category {
-        categoryId
-        categoryName
-        description
-      }
-      products {
-        productId
-        productName
-        basePrice
-        sku
-      }
-    }
-  }
-`;
-
-export const GET_EXPIRED_PROMOTIONS = gql`
-  query PromotionsExpired {
-    promotionsExpired {
-      promotionId
-      promotionName
-      description
-      startDate
-      endDate
-      discountPercentage
-      status {
-        statusId
-        statusName
-      }
-      user {
-        userId
-        userName
-        email
-      }
-      category {
-        categoryId
-        categoryName
-        description
-      }
-      products {
-        productId
-        productName
-        basePrice
-        sku
-      }
-    }
-  }
-`;
-
-export const GET_SCHEDULED_PROMOTIONS = gql`
-  query PromotionsScheduled {
-    promotionsScheduled {
-      promotionId
-      promotionName
-      description
-      startDate
-      endDate
-      discountPercentage
-      status {
-        statusId
-        statusName
-      }
-      user {
-        userId
-        userName
-        email
-      }
-      category {
-        categoryId
-        categoryName
-        description
-      }
-      products {
-        productId
-        productName
-        basePrice
-        sku
-      }
-    }
-  }
-`;
-
-export interface PromotionDeleted {
-  promotionId: string;
-  promotionName: string;
+  id: string;
+  name: string;
   description: string;
-  startDate: string;
-  endDate: string;
-  discountPercentage: number;
-  status: {
-    statusId: string;
-    statusName: string;
-  };
-  user: {
-    userId: number;
-    userName: string;
-    email: string;
-  };
-  category: {
-    categoryId: number;
-    categoryName: string;
-    description: string;
-  };
-  deletedAt: string;
-  deletedBy: {
-    userId: number;
-    userName: string;
-    email: string;
-  };
-  daysUntilPurge: number;
+  price: number;
+  image: string;
+  categoryId: string;
 }
 
-export const GET_DELETED_PROMOTIONS = gql`
-  query DeletedPromotions {
-    deletedPromotions {
-      promotionId
-      promotionName
-      description
-      startDate
-      endDate
-      discountPercentage
-      status {
-        statusId
-        statusName
-      }
-      user {
-        userId
-        userName
-        email
-      }
-      category {
-        categoryId
-        categoryName
-        description
-      }
-      deletedAt
-      deletedBy {
-        userId
-        userName
-        email
-      }
-      daysUntilPurge
+export interface Category {
+  id: string;
+  name: string;
+}
+
+const STORAGE_KEY = 'petstore:promotions';
+const CATEGORIES_KEY = 'petstore:categories';
+const PRODUCTS_KEY = 'petstore:products';
+
+class PromotionService {
+  private readRaw(): Promotion[] {
+    try {
+      const data = localStorage.getItem(STORAGE_KEY);
+      if (!data) return [];
+      
+      const promotions = JSON.parse(data);
+      // Normalize data: ensure id is string, productIds is string[]
+      return promotions.map((p: any) => ({
+        ...p,
+        id: String(p.id),
+        productIds: Array.isArray(p.productIds) 
+          ? p.productIds.map((id: any) => String(id))
+          : [],
+        active: p.active !== undefined ? p.active : true,
+      }));
+    } catch (error) {
+      console.error('Error reading promotions:', error);
+      return [];
     }
   }
-`;
 
-export interface ActivePromotionsResponse {
-  promotionsActive: Promotion[];
+  private write(promotions: Promotion[]): void {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(promotions));
+    } catch (error) {
+      console.error('Error writing promotions:', error);
+    }
+  }
+
+  getAll(): Promotion[] {
+    return this.readRaw();
+  }
+
+  getActive(): Promotion[] {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    const today = now.toISOString().slice(0, 10);
+    
+    return this.readRaw().filter(p => 
+      p.active && 
+      p.startDate <= today && 
+      p.endDate >= today
+    );
+  }
+
+  getScheduled(): Promotion[] {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    const today = now.toISOString().slice(0, 10);
+    
+    return this.readRaw().filter(p => 
+      p.active && 
+      p.startDate > today
+    );
+  }
+
+  getExpired(): Promotion[] {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    const today = now.toISOString().slice(0, 10);
+    
+    return this.readRaw().filter(p => 
+      p.active && 
+      p.endDate < today
+    );
+  }
+
+  getDeleted(): Promotion[] {
+    return this.readRaw().filter(p => !p.active);
+  }
+
+  findById(id: string): Promotion | null {
+    const normalized = String(id);
+    return this.readRaw().find(p => String(p.id) === normalized) ?? null;
+  }
+
+  create(data: Omit<Promotion, 'id' | 'createdAt' | 'active'>): Promotion {
+    const newPromotion: Promotion = {
+      ...data,
+      id: uuidv4(),
+      active: true,
+      createdAt: new Date().toISOString(),
+    };
+    
+    const promotions = this.readRaw();
+    promotions.push(newPromotion);
+    this.write(promotions);
+    
+    return newPromotion;
+  }
+
+  update(id: string, changes: Partial<Promotion>): Promotion | null {
+    const promotions = this.readRaw();
+    const index = promotions.findIndex(p => String(p.id) === String(id));
+    
+    if (index === -1) return null;
+    
+    promotions[index] = { ...promotions[index], ...changes };
+    this.write(promotions);
+    
+    return promotions[index];
+  }
+
+  remove(id: string): boolean {
+    const result = this.update(id, { active: false });
+    return result !== null;
+  }
+
+  restore(id: string): boolean {
+    const result = this.update(id, { active: true });
+    return result !== null;
+  }
+
+  purge(id: string): boolean {
+    const promotions = this.readRaw();
+    const filtered = promotions.filter(p => String(p.id) !== String(id));
+    
+    if (filtered.length === promotions.length) return false;
+    
+    this.write(filtered);
+    return true;
+  }
+
+  // Category methods
+  getCategories(): Category[] {
+    try {
+      const data = localStorage.getItem(CATEGORIES_KEY);
+      if (!data) {
+        // Initialize with default categories
+        const defaultCategories: Category[] = [
+          { id: '1', name: 'Alimentos' },
+          { id: '2', name: 'Accesorios' },
+          { id: '3', name: 'Higiene' },
+          { id: '4', name: 'Salud' },
+          { id: '5', name: 'Juguetes' },
+          { id: '6', name: 'Transporte' },
+          { id: '7', name: 'Ropa' },
+          { id: '8', name: 'Acuarios y Terrarios' },
+          { id: '9', name: 'Entrenamiento' },
+          { id: '10', name: 'Ganadería' },
+        ];
+        localStorage.setItem(CATEGORIES_KEY, JSON.stringify(defaultCategories));
+        return defaultCategories;
+      }
+      return JSON.parse(data);
+    } catch (error) {
+      console.error('Error reading categories:', error);
+      return [];
+    }
+  }
+
+  // Product methods
+  getProducts(): Product[] {
+    try {
+      const data = localStorage.getItem(PRODUCTS_KEY);
+      if (!data) {
+        // Initialize with mock products
+        const mockProducts: Product[] = [];
+        const categories = this.getCategories();
+        
+        categories.forEach(cat => {
+          for (let i = 1; i <= 10; i++) {
+            mockProducts.push({
+              id: `${cat.id}-${i}`,
+              name: `Producto ${i} de ${cat.name}`,
+              description: `Descripción del producto ${i}`,
+              price: Math.floor(Math.random() * 100) + 10,
+              image: '/placeholder.svg',
+              categoryId: cat.id,
+            });
+          }
+        });
+        
+        localStorage.setItem(PRODUCTS_KEY, JSON.stringify(mockProducts));
+        return mockProducts;
+      }
+      return JSON.parse(data);
+    } catch (error) {
+      console.error('Error reading products:', error);
+      return [];
+    }
+  }
+
+  getProductsByCategory(categoryId: string): Product[] {
+    return this.getProducts().filter(p => p.categoryId === categoryId);
+  }
 }
 
-export interface ExpiredPromotionsResponse {
-  promotionsExpired: Promotion[];
-}
-
-export interface ScheduledPromotionsResponse {
-  promotionsScheduled: Promotion[];
-}
-
+export const promotionService = new PromotionService();
