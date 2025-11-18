@@ -17,6 +17,7 @@ const httpLink = new HttpLink({
     uri: 'https://petstore-feature5-backend.onrender.com/graphql',
     credentials: 'include',
 });
+// https://petstore-feature5-backend.onrender.com/graphql o http://localhost:8080/graphql
 
 const client = new ApolloClient({
     link: authLink.concat(httpLink),
