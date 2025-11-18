@@ -44,15 +44,7 @@ const CreatePromotion = () => {
     if (!formData) return;
     setIsSaving(true);
     try {
-      promotionService.create({
-        name: formData.name,
-        description: formData.description,
-        startDate: formData.startDate,
-        endDate: formData.endDate,
-        category: formData.category,
-        discount: formData.discount,
-        productIds: selectedProducts
-      });
+      promotionService.create({ ...formData, productIds: selectedProducts });
       toast({ title: 'Promoción creada' });
       navigate('/admin/promotions');
     } catch (error) {
