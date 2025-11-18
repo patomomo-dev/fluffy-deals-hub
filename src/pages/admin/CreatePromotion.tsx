@@ -11,8 +11,10 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Layout } from '@/components/layout/Layout';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Loader2 } from 'lucide-react';
+import { ArrowLeft, Loader2, Mail } from 'lucide-react';
 import { promotionService } from '@/services/promotionService';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { promotionSchema, type PromotionFormData } from '@/lib/validators/promotionSchema';
 
 const CreatePromotion = () => {
@@ -53,7 +55,26 @@ const CreatePromotion = () => {
         discount: formData.discount,
         productIds: selectedProducts
       });
-      toast({ title: 'Promoción creada' });
+      
+      const activationDate = format(new Date(), "dd 'de' MMMM 'de' yyyy", { locale: es });
+      const activationTime = format(new Date(), "HH:mm:ss");
+      
+      toast({
+        title: (
+          <div className="flex items-center gap-2">
+            <Mail className="h-5 w-5 text-blue-600" />
+            <span>Notificación para Administrador de Marketing</span>
+          </div>
+        ) as any,
+        description: (
+          <div className="mt-2">
+            <p className="font-semibold text-green-600">¡La promoción ha sido activada con éxito!</p>
+            <p className="mt-1 text-sm">Fecha de activación: {activationDate}</p>
+            <p className="text-sm">Hora de activación: {activationTime}</p>
+          </div>
+        ) as any,
+      });
+      
       navigate('/admin/promotions');
     } catch (error) {
       toast({ title: 'Error', variant: 'destructive' });
