@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Edit, Trash2, RotateCcw, XCircle } from 'lucide-react';
+import { Plus, Edit, Trash2, RotateCcw, XCircle, BarChart3 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Layout } from '@/components/layout/Layout';
 import { useToast } from '@/hooks/use-toast';
 import { DeletePromotionDialog } from '@/components/DeletePromotionDialog';
@@ -22,7 +23,9 @@ import accessoriesPromotions from '@/assets/accessories-promotions.png';
 const PromotionsList = () => {
   const { toast } = useToast();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [descriptionDialogOpen, setDescriptionDialogOpen] = useState(false);
   const [selectedPromotion, setSelectedPromotion] = useState<{ id: string; name: string } | null>(null);
+  const [selectedDescription, setSelectedDescription] = useState<{ name: string; description: string } | null>(null);
   const [filter, setFilter] = useState<PromotionStatus>('ALL');
   const [promotions, setPromotions] = useState<Promotion[]>([]);
 
@@ -141,12 +144,18 @@ const PromotionsList = () => {
                 const categories = promotionService.getCategories();
                 const category = categories.find(c => c.id === promo.category);
                 
-                return (
-                  <Card key={promo.id} className="overflow-hidden hover:shadow-lg transition-shadow">
-                    <div className="flex flex-col md:flex-row">
-                      <div className="md:w-1/3 lg:w-1/4">
-                        <img src={getPromotionImage(promo.category)} alt={promo.name} className="w-full h-48 md:h-full object-cover" />
-                      </div>
+                  return (
+                    <Card key={promo.id} className="overflow-hidden hover:shadow-lg transition-shadow">
+                      <div className="flex flex-col md:flex-row">
+                        <div 
+                          className="md:w-1/3 lg:w-1/4 cursor-pointer hover:opacity-90 transition-opacity"
+                          onClick={() => {
+                            setSelectedDescription({ name: promo.name, description: promo.description });
+                            setDescriptionDialogOpen(true);
+                          }}
+                        >
+                          <img src={getPromotionImage(promo.category)} alt={promo.name} className="w-full h-48 md:h-full object-cover" />
+                        </div>
                       
                       <div className="flex-1 p-6">
                         <h2 className="text-2xl font-bold text-primary mb-2">{promo.name}</h2>
@@ -165,6 +174,12 @@ const PromotionsList = () => {
                         <div className="flex gap-2 flex-wrap">
                           {!isTrashView ? (
                             <>
+                              <Link to={`/admin/promotions/${promo.id}`}>
+                                <Button variant="outline" size="sm" className="gap-2">
+                                  <BarChart3 size={16} />
+                                  Ver Métricas
+                                </Button>
+                              </Link>
                               <Link to={`/admin/promotions/${promo.id}/edit`}>
                                 <Button variant="outline" size="sm" className="gap-2">
                                   <Edit size={16} />
@@ -200,6 +215,17 @@ const PromotionsList = () => {
       </Layout>
 
       <DeletePromotionDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen} onConfirm={handleDeleteConfirm} promotionName={selectedPromotion?.name || ''} />
+      
+      <Dialog open={descriptionDialogOpen} onOpenChange={setDescriptionDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{selectedDescription?.name}</DialogTitle>
+            <DialogDescription className="text-base mt-4">
+              {selectedDescription?.description}
+            </DialogDescription>
+          </DialogHeader>
+        </DialogContent>
+      </Dialog>
     </>
   );
 };
