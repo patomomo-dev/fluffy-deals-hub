@@ -1,15 +1,17 @@
-import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Layout } from '@/components/layout/Layout';
+import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
-import { authService } from '@/services/authService';
-import { Loader2 } from 'lucide-react';
+import { AUTH_LOGIN, LoginResponse, LoginVariables } from '@/services/authService';
+import { useMutation } from '@apollo/client/react';
+
 
 const loginSchema = z.object({
   email: z.string().email('Email inválido'),
@@ -19,9 +21,11 @@ const loginSchema = z.object({
 type LoginForm = z.infer<typeof loginSchema>;
 
 const Login = () => {
-  const [isLoading, setIsLoading] = useState(false);
-  const navigate = useNavigate();
+  const { login } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
+
+  const [loginMutation, { loading }] = useMutation<LoginResponse, LoginVariables>(AUTH_LOGIN);
 
   const {
     register,
@@ -32,112 +36,105 @@ const Login = () => {
   });
 
   const onSubmit = async (data: LoginForm) => {
-    setIsLoading(true);
 
     try {
-      const result = authService.login(data.email, data.password);
+      const result = await loginMutation({
+        variables: {
+          email: data.email,
+          password: data.password,
+        },
+      });
 
-      if (result.success) {
+      const { success, token } = result.data.login;
+
+      if (success && token) {
+        localStorage.setItem('token', token);
+
+        login(data.email, data.password, token);
+
         toast({
-          title: 'Inicio de sesión exitoso',
-          description: `Bienvenido ${result.user?.name}`,
+          title: "Inicio de sesión exitoso",
+          description: "Bienvenido a PetStore",
         });
         navigate('/admin/promotions');
+      }
+    } catch (error: any) {
+      const errorMessage = error?.message || error?.graphQLErrors?.[0]?.message || "";
+      if (errorMessage.includes('non null type')) {
+        toast({
+          title: "Error de autenticación",
+          description: "Email o contraseña incorrectos",
+          variant: "destructive"
+        });
       } else {
         toast({
-          title: 'Error',
-          description: result.error || 'Credenciales inválidas',
-          variant: 'destructive',
+          title: "Error",
+          description: error.message || "Ocurrió un error inesperado",
+          variant: "destructive",
         });
       }
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Ocurrió un error al iniciar sesión',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle className="text-3xl font-bold text-center text-primary">
-            PetStore
-          </CardTitle>
-          <p className="text-center text-muted-foreground mt-2">
-            Inicia sesión para gestionar promociones
-          </p>
-        </CardHeader>
-        
-        <form onSubmit={handleSubmit(onSubmit)}>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="admin@petstore.com"
-                {...register('email')}
-                className="focus-visible:ring-2 focus-visible:ring-yellow-400"
-                disabled={isLoading}
-              />
-              {errors.email && (
-                <p className="text-sm text-destructive">{errors.email.message}</p>
-              )}
-            </div>
+    <Layout>
+      <div className="container mx-auto px-6 py-16">
+        <div className="max-w-md mx-auto">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-2xl text-center text-primary">
+                Iniciar Sesión
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    {...register('email')}
+                    className={errors.email ? 'border-destructive' : ''}
+                  />
+                  {errors.email && (
+                    <p className="text-sm text-destructive">{errors.email.message}</p>
+                  )}
+                </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="password">Contraseña</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                {...register('password')}
-                className="focus-visible:ring-2 focus-visible:ring-yellow-400"
-                disabled={isLoading}
-              />
-              {errors.password && (
-                <p className="text-sm text-destructive">{errors.password.message}</p>
-              )}
-            </div>
+                <div className="space-y-2">
+                  <Label htmlFor="password">Contraseña</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    {...register('password')}
+                    className={errors.password ? 'border-destructive' : ''}
+                  />
+                  {errors.password && (
+                    <p className="text-sm text-destructive">{errors.password.message}</p>
+                  )}
+                </div>
 
-            <div className="text-sm">
-              <Link 
-                to="/"
-                className="text-primary hover:underline focus-visible:ring-2 focus-visible:ring-yellow-400 rounded px-1"
-              >
-                ¿Olvidaste tu contraseña?
-              </Link>
-            </div>
-          </CardContent>
+                <Button
+                  type="submit"
+                  className="w-full"
+                  disabled={loading}
+                >
+                  {loading ? 'Iniciando sesión...' : 'Iniciar sesión'}
+                </Button>
 
-          <CardFooter className="flex flex-col gap-4">
-            <Button
-              type="submit"
-              className="w-full bg-primary hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-yellow-400"
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Iniciando sesión...
-                </>
-              ) : (
-                'Iniciar sesión'
-              )}
-            </Button>
-
-            <p className="text-sm text-muted-foreground text-center">
-              Credenciales de prueba: admin@petstore.com / admin123
-            </p>
-          </CardFooter>
-        </form>
-      </Card>
-    </div>
+                <div className="text-center">
+                  <a href="#"
+                    className="text-sm text-primary hover:underline"
+                  >
+                    ¿Olvidaste tu contraseña?
+                  </a>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </Layout>
   );
 };
 

@@ -1,82 +1,60 @@
+import { gql } from '@apollo/client';
+
 export interface User {
-  id: string;
-  name: string;
+  userId: number;
+  userName: string;
   email: string;
-  password: string; // In production, this would be hashed
-  role: 'admin' | 'user';
+  role: {
+    roleId: number;
+    roleName: string;
+  };
 }
 
-export interface Session {
-  userId: string;
-  email: string;
-  name: string;
-  role: string;
+export interface LoginResponse {
+  login: {
+    success: boolean;
+    token: string;
+    user: User;
+  };
 }
 
-const USERS_KEY = 'petstore:users';
-const SESSION_KEY = 'petstore:session';
+export interface CurrentUserResponse {
+  currentUser: User;
+}
 
-class AuthService {
-  private getUsers(): User[] {
-    try {
-      const data = localStorage.getItem(USERS_KEY);
-      if (!data) {
-        // Initialize with default admin user
-        const defaultUsers: User[] = [
-          {
-            id: '1',
-            name: 'Admin',
-            email: 'admin@petstore.com',
-            password: 'admin123',
-            role: 'admin',
-          },
-        ];
-        localStorage.setItem(USERS_KEY, JSON.stringify(defaultUsers));
-        return defaultUsers;
+export interface LoginVariables {
+  email: string;
+  password: string;
+}
+
+export const AUTH_LOGIN = gql`
+  mutation Login($email: String!, $password: String!) {
+    login(email: $email, password: $password) {
+      success
+      token
+      user {
+        userId
+        userName
+        email
+        role {
+          roleId
+          roleName
+        }
       }
-      return JSON.parse(data);
-    } catch (error) {
-      console.error('Error reading users:', error);
-      return [];
     }
   }
+`;
 
-  login(email: string, password: string): { success: boolean; user?: Session; error?: string } {
-    const users = this.getUsers();
-    const user = users.find(u => u.email === email && u.password === password);
-    
-    if (!user) {
-      return { success: false, error: 'Credenciales inválidas' };
-    }
-
-    const session: Session = {
-      userId: user.id,
-      email: user.email,
-      name: user.name,
-      role: user.role,
-    };
-
-    localStorage.setItem(SESSION_KEY, JSON.stringify(session));
-    return { success: true, user: session };
-  }
-
-  logout(): void {
-    localStorage.removeItem(SESSION_KEY);
-  }
-
-  getSession(): Session | null {
-    try {
-      const data = localStorage.getItem(SESSION_KEY);
-      return data ? JSON.parse(data) : null;
-    } catch (error) {
-      console.error('Error reading session:', error);
-      return null;
+export const GET_CURRENT_USER = gql`
+  query CurrentUser {
+    currentUser {
+      userId
+      userName
+      email
+      role {
+        roleId
+        roleName
+      }
     }
   }
-
-  isAuthenticated(): boolean {
-    return this.getSession() !== null;
-  }
-}
-
-export const authService = new AuthService();
+`;
