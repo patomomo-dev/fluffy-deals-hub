@@ -6,7 +6,6 @@ import { AuthProvider } from "@/context/AuthContext";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
 import PromotionsList from "./pages/admin/PromotionsList";
-import PromotionMetrics from "./pages/admin/PromotionMetrics";
 import CreatePromotion from "./pages/admin/CreatePromotion";
 import EditPromotion from "./pages/admin/EditPromotion";
 import NotFound from "./pages/NotFound";
@@ -26,7 +25,6 @@ const App = () => (
         <Route element={<ProtectedRoute />}>
           <Route path="/admin/promotions" element={<PromotionsList />} />
           <Route path="/admin/promotions/create" element={<CreatePromotion />} />
-          <Route path="/admin/promotions/:id" element={<PromotionMetrics />} />
           <Route path="/admin/promotions/:id/edit" element={<EditPromotion />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
         </Route>
