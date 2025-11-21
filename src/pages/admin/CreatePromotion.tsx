@@ -13,7 +13,9 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Layout } from '@/components/layout/Layout';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Package, Loader2 } from 'lucide-react';
+import { ArrowLeft, Package, Loader2, Mail } from 'lucide-react';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 import {
   CREATE_PROMOTION,
   ASSOCIATE_PRODUCTS_TO_PROMOTION,
@@ -121,9 +123,24 @@ const CreatePromotion = () => {
     {
       refetchQueries: [{ query: GET_PROMOTIONS }],
       onCompleted: () => {
+        const now = new Date();
+        const dateStr = format(now, "dd 'de' MMMM 'de' yyyy", { locale: es });
+        const timeStr = format(now, 'HH:mm:ss');
+        
         toast({
-          title: "Promoción creada",
-          description: "La promoción y los productos se han asociado exitosamente",
+          title: (
+            <div className="flex items-center gap-2">
+              <Mail className="h-5 w-5" />
+              <span>¡La promoción ha sido activada con éxito!</span>
+            </div>
+          ) as any,
+          description: (
+            <div className="space-y-1 mt-2">
+              <p className="font-medium">Fecha de activación: {dateStr}</p>
+              <p className="font-medium">Hora de activación: {timeStr}</p>
+              <p className="text-sm text-muted-foreground mt-2">Notificación para Administrador de Marketing</p>
+            </div>
+          ) as any,
         });
         navigate('/admin/promotions');
       },
