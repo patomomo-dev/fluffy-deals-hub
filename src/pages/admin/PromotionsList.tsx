@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Plus, Eye, Edit, Trash2, RotateCcw, XCircle } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Plus, Eye, Edit, Trash2, RotateCcw, XCircle, BarChart3 } from 'lucide-react';
 import { useMutation, useQuery } from '@apollo/client/react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -9,6 +9,13 @@ import { useToast } from '@/hooks/use-toast';
 import { DeletePromotionDialog } from '@/components/DeletePromotionDialog';
 import { PromotionFilters, PromotionStatus } from '@/components/PromotionFilters';
 import { usePromotionFilters } from '@/hooks/usePromotionsFilter';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   DELETE_PROMOTION,
   RESTORE_PROMOTION,
@@ -34,8 +41,11 @@ import { GET_CURRENT_USER, type CurrentUserResponse } from '@/services/authServi
 
 const PromotionsList = () => {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [descriptionDialogOpen, setDescriptionDialogOpen] = useState(false);
   const [selectedPromotion, setSelectedPromotion] = useState<{ id: string; name: string } | null>(null);
+  const [selectedPromotionDescription, setSelectedPromotionDescription] = useState<{ name: string; description: string } | null>(null);
   const [filter, setFilter] = useState<PromotionStatus>('ALL');
 
   const { promotions, loading, error, refetch } = usePromotionFilters(filter);
@@ -269,7 +279,16 @@ const PromotionsList = () => {
                     className="overflow-hidden hover:shadow-lg transition-shadow"
                   >
                     <div className="flex flex-col md:flex-row">
-                      <div className="md:w-48 h-48 md:h-auto bg-custom-beige">
+                      <div 
+                        className="md:w-48 h-48 md:h-auto bg-custom-beige cursor-pointer hover:opacity-80 transition-opacity"
+                        onClick={() => {
+                          setSelectedPromotionDescription({
+                            name: promotion.promotionName,
+                            description: promotion.description || 'Sin descripción'
+                          });
+                          setDescriptionDialogOpen(true);
+                        }}
+                      >
                         <img
                           src={getPromotionImage(promotion.category.categoryName)}
                           alt={promotion.promotionName}
@@ -323,9 +342,14 @@ const PromotionsList = () => {
                         <div className="flex gap-2 mt-4">
                           {!isTrashView ? (
                             <>
-                              <Button variant="outline" size="sm" className="flex items-center gap-1">
-                                <Eye size={16} />
-                                Ver
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="flex items-center gap-1"
+                                onClick={() => navigate(`/admin/promotions/${promotion.promotionId}/metrics`)}
+                              >
+                                <BarChart3 size={16} />
+                                Ver Métricas
                               </Button>
                               <Link to={`/admin/promotions/${promotion.promotionId}/edit`}>
                                 <Button variant="outline" size="sm" className="flex items-center gap-1">
@@ -385,6 +409,17 @@ const PromotionsList = () => {
         onConfirm={handleDeleteConfirm}
         promotionName={selectedPromotion?.name || ''}
       />
+
+      <Dialog open={descriptionDialogOpen} onOpenChange={setDescriptionDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{selectedPromotionDescription?.name}</DialogTitle>
+            <DialogDescription className="pt-4">
+              {selectedPromotionDescription?.description}
+            </DialogDescription>
+          </DialogHeader>
+        </DialogContent>
+      </Dialog>
     </>
   );
 };
