@@ -18,6 +18,7 @@ interface ProductInventory {
   finalStock: number;
   unitsSold: number;
   variation: number;
+  revenue: number;
 }
 
 const generateProductInventory = (promotion: any): ProductInventory[] => {
@@ -36,6 +37,9 @@ const generateProductInventory = (promotion: any): ProductInventory[] => {
     // Validación: stock final será siempre initialStock - unitsSold (no negativo ni mayor al inicial)
     const finalStock = initialStock - unitsSold;
     const variation = ((unitsSold / initialStock) * 100);
+    // Calcular ingresos por producto (precio unitario simulado entre $10 y $100)
+    const unitPrice = Math.floor(Math.random() * 90) + 10;
+    const revenue = unitsSold * unitPrice;
 
     return {
       productId: product.productId,
@@ -44,6 +48,7 @@ const generateProductInventory = (promotion: any): ProductInventory[] => {
       finalStock,
       unitsSold,
       variation,
+      revenue,
     };
   });
 };
@@ -179,6 +184,37 @@ const PromotionMetrics = () => {
             </CardContent>
           </Card>
         </div>
+
+        {/* Cards de ganancias por producto */}
+        {hasMetrics && (
+          <div className="mb-8" role="region" aria-label="Ganancias por producto">
+            <h2 className="text-2xl font-semibold mb-4 text-foreground">Ganancias por Producto</h2>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {isRefreshing ? (
+                [1, 2, 3].map(i => (
+                  <Skeleton key={i} className="h-32" />
+                ))
+              ) : (
+                productInventory.map((product) => (
+                  <Card key={product.productId}>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-lg">{product.productName}</CardTitle>
+                      <CardDescription>Ingresos individuales</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-3xl font-bold text-primary" aria-label={`${product.revenue} dólares generados`}>
+                        ${product.revenue.toFixed(2)}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        {product.unitsSold} unidades vendidas
+                      </p>
+                    </CardContent>
+                  </Card>
+                ))
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Tabla de variación de inventario */}
         <Card className="mb-8" role="region" aria-label="Variación de inventario de productos">
