@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, TrendingUp, Eye, MousePointer, ShoppingCart, RefreshCw } from 'lucide-react';
+import { ArrowLeft, TrendingUp, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Layout } from '@/components/layout/Layout';
@@ -26,8 +26,14 @@ const generateProductInventory = (promotion: any): ProductInventory[] => {
   }
 
   return promotion.products.map((product: any) => {
+    // Validación: stock inicial debe ser positivo
     const initialStock = Math.floor(Math.random() * 200) + 50;
-    const unitsSold = Math.floor(Math.random() * 100) + 10;
+    // Validación: unidades vendidas no pueden ser negativas ni mayores al stock inicial
+    const unitsSold = Math.min(
+      Math.floor(Math.random() * 100) + 10,
+      initialStock
+    );
+    // Validación: stock final será siempre initialStock - unitsSold (no negativo ni mayor al inicial)
     const finalStock = initialStock - unitsSold;
     const variation = ((unitsSold / initialStock) * 100);
 
@@ -53,9 +59,6 @@ const PromotionMetrics = () => {
 
   // Datos simulados de métricas con estado para actualizaciones dinámicas
   const [metrics, setMetrics] = useState({
-    views: Math.floor(Math.random() * 5000) + 1000,
-    clicks: Math.floor(Math.random() * 1000) + 200,
-    conversions: Math.floor(Math.random() * 200) + 50,
     revenue: (Math.random() * 50000 + 10000).toFixed(2),
   });
 
@@ -75,9 +78,6 @@ const PromotionMetrics = () => {
       // Simular actualización de métricas
       setTimeout(() => {
         setMetrics({
-          views: Math.floor(Math.random() * 5000) + 1000,
-          clicks: Math.floor(Math.random() * 1000) + 200,
-          conversions: Math.floor(Math.random() * 200) + 50,
           revenue: (Math.random() * 50000 + 10000).toFixed(2),
         });
         
@@ -88,13 +88,11 @@ const PromotionMetrics = () => {
         setLastUpdate(new Date());
         setIsRefreshing(false);
       }, 500);
-    }, 10000); // Actualizar cada 10 segundos
+    }, 60000); // Actualizar cada 1 minuto
 
     return () => clearInterval(interval);
   }, [promotion]);
 
-  const conversionRate = ((metrics.conversions / metrics.clicks) * 100).toFixed(2);
-  const clickRate = ((metrics.clicks / metrics.views) * 100).toFixed(2);
 
   if (loading) {
     return (
@@ -161,64 +159,7 @@ const PromotionMetrics = () => {
           </div>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8" role="region" aria-label="Métricas principales">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Vistas Totales</CardTitle>
-              <Eye className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-            </CardHeader>
-            <CardContent>
-              {isRefreshing ? (
-                <Skeleton className="h-8 w-24 mb-2" />
-              ) : (
-                <div className="text-2xl font-bold" aria-label={`${metrics.views.toLocaleString()} vistas totales`}>
-                  {metrics.views.toLocaleString()}
-                </div>
-              )}
-              <p className="text-xs text-muted-foreground">
-                +12.5% desde el inicio
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Clics</CardTitle>
-              <MousePointer className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-            </CardHeader>
-            <CardContent>
-              {isRefreshing ? (
-                <Skeleton className="h-8 w-24 mb-2" />
-              ) : (
-                <div className="text-2xl font-bold" aria-label={`${metrics.clicks.toLocaleString()} clics`}>
-                  {metrics.clicks.toLocaleString()}
-                </div>
-              )}
-              <p className="text-xs text-muted-foreground">
-                Tasa de clic: {clickRate}%
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Conversiones</CardTitle>
-              <ShoppingCart className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-            </CardHeader>
-            <CardContent>
-              {isRefreshing ? (
-                <Skeleton className="h-8 w-24 mb-2" />
-              ) : (
-                <div className="text-2xl font-bold" aria-label={`${metrics.conversions.toLocaleString()} conversiones`}>
-                  {metrics.conversions.toLocaleString()}
-                </div>
-              )}
-              <p className="text-xs text-muted-foreground">
-                Tasa de conversión: {conversionRate}%
-              </p>
-            </CardContent>
-          </Card>
-
+        <div className="grid gap-6 md:grid-cols-1 mb-8" role="region" aria-label="Métricas principales">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Ingresos Generados</CardTitle>
@@ -346,16 +287,16 @@ const PromotionMetrics = () => {
             </CardHeader>
             <CardContent className="space-y-2">
               <div className="flex justify-between">
-                <span className="text-muted-foreground">CTR (Click-Through Rate):</span>
-                <span className="font-medium">{clickRate}%</span>
+                <span className="text-muted-foreground">Ingresos Totales:</span>
+                <span className="font-medium">${metrics.revenue}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Tasa de Conversión:</span>
-                <span className="font-medium">{conversionRate}%</span>
+                <span className="text-muted-foreground">Productos Asociados:</span>
+                <span className="font-medium">{productInventory.length}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Ingreso por Conversión:</span>
-                <span className="font-medium">${(parseFloat(metrics.revenue) / metrics.conversions).toFixed(2)}</span>
+                <span className="text-muted-foreground">Unidades Vendidas Total:</span>
+                <span className="font-medium">{productInventory.reduce((sum, item) => sum + item.unitsSold, 0)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Desempeño:</span>
