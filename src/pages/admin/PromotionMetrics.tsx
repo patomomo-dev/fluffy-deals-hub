@@ -37,9 +37,9 @@ const generateProductInventory = (promotion: any): ProductInventory[] => {
     // Validación: stock final será siempre initialStock - unitsSold (no negativo ni mayor al inicial)
     const finalStock = initialStock - unitsSold;
     const variation = ((unitsSold / initialStock) * 100);
-    // Calcular ingresos por producto (precio unitario simulado entre $10 y $100)
+    // Calcular ingresos por producto: precio unitario * unidades vendidas
     const unitPrice = Math.floor(Math.random() * 90) + 10;
-    const revenue = unitsSold * unitPrice;
+    const revenue = unitPrice * unitsSold; // Ingresos = precio unitario * cantidad vendida
 
     return {
       productId: product.productId,
@@ -48,7 +48,7 @@ const generateProductInventory = (promotion: any): ProductInventory[] => {
       finalStock,
       unitsSold,
       variation,
-      revenue,
+      revenue, // Ingresos individuales ya incluyen la multiplicación
     };
   });
 };
