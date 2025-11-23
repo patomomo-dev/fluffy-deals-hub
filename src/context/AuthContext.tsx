@@ -7,16 +7,20 @@ interface AuthContextType {
   logout: () => void;
   isAuthenticated: () => boolean;
   register: (email: string, password: string) => boolean;
+  loading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
     if (storedUser) setUser(storedUser);
+
+    setLoading(false); // 🔥 Muy importante
   }, []);
 
   const login = (email: string, password: string, token?: string) => {
@@ -52,7 +56,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, isAuthenticated, register }}>
+    <AuthContext.Provider value={{ user, login, logout, isAuthenticated, register, loading }}>
       {children}
     </AuthContext.Provider>
   );

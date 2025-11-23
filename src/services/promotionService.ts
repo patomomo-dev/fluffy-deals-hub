@@ -1,5 +1,5 @@
 import { gql } from '@apollo/client';
-
+// --------------- BASIC PROMOTION QUERIES/MUTATIONS ---------------
 export interface Promotion {
   promotionId: string;
   promotionName: string;
@@ -162,7 +162,6 @@ export const UPDATE_PROMOTION = gql`
   }
 `;
 
-//MODIFICAR
 export const DELETE_PROMOTION = gql`
   mutation DeletePromotion($id: ID!, $userId: ID) {
     deletePromotion(id: $id, userId: $userId)
@@ -173,7 +172,6 @@ export interface DeletePromotionResponse {
   deletePromotion: boolean;
 }
 
-//MODIFICAR
 export const RESTORE_PROMOTION = gql`
   mutation RestorePromotion($id: ID!, $userId: ID!) {
     restorePromotion(id: $id, userId: $userId)
@@ -184,7 +182,6 @@ export interface RestorePromotionResponse {
   restorePromotion: boolean;
 }
 
-//MODIFICAR
 export const PERMANENTLY_DELETE_PROMOTION = gql`
   mutation PermanentDeletePromotion($id: ID!, $userId: ID!) {
     permanentDeletePromotion(id: $id, userId: $userId)
@@ -195,6 +192,7 @@ export interface PermanentDeletePromotionResponse {
   permanentDeletePromotion: boolean;
 }
 
+// --------------- CATEGORY AND PRODUCT QUERIES/MUTATIONS ---------------
 export const GET_CATEGORIES = gql`
   query Categories {
     categories {
@@ -282,6 +280,7 @@ export interface ProductsByCategoryResponse {
   productsByCategory: Product[];
 }
 
+// --------------- PROMOTION FILTER QUERIES ---------------
 export const GET_ACTIVE_PROMOTIONS = gql`
   query PromotionsActive {
     promotionsActive {
@@ -456,4 +455,152 @@ export interface ExpiredPromotionsResponse {
 export interface ScheduledPromotionsResponse {
   promotionsScheduled: Promotion[];
 }
+
+// --------------- PROMOTION METRICS QUERIES/MUTATIONS ---------------
+export interface ProductMetrics {
+  productId: string;
+  productName: string;
+  productSku: string;
+  basePrice: number;
+  discountedPrice: number;
+  initialInventory: number;
+  currentInventory: number;
+  inventoryDifference: number;
+  inventoryReductionPercentage: number;
+  unitsSold: number;
+  skuVariationPercentage: number | null;
+  revenueGenerated: number;
+  category: {
+    categoryId: string;
+    categoryName: string;
+    description: string;
+  };
+  lastUpdated: string | null;
+}
+
+export interface PromotionPerformance {
+  promotionId: string;
+  promotionName: string;
+  promotionDescription: string | null;
+  discountPercentage: number;
+  startDate: string;
+  endDate: string;
+  isActive: boolean;
+  totalProducts: number;
+  totalUnitsSold: number;
+  totalRevenue: number;
+  totalInitialInventory: number;
+  totalCurrentInventory: number;
+  totalInventoryDifference: number;
+  inventoryReductionPercentage: number;
+  averageSkuVariationPercentage: number | null;
+  lastUpdated: string | null;
+  productMetrics: ProductMetrics[];
+}
+
+export interface PromotionPerformanceResponse {
+  promotionPerformance: PromotionPerformance | null;
+}
+
+export interface PromotionHasMetricsResponse {
+  promotionHasMetrics: boolean;
+}
+
+export interface ProductMetricsResponse {
+  promotionProductMetrics: ProductMetrics[];
+}
+
+export interface InitializeMetricsResponse {
+  initializePromotionMetrics: boolean;
+}
+
+export interface SimulateMetricsResponse {
+  simulateMetricsUpdate: boolean;
+}
+
+export const CHECK_PROMOTION_HAS_METRICS = gql`
+  query PromotionHasMetrics($promotionId: ID!) {
+    promotionHasMetrics(promotionId: $promotionId)
+  }
+`;
+
+export const GET_PROMOTION_PERFORMANCE = gql`
+  query GetPromotionPerformance($promotionId: ID!) {
+    promotionPerformance(promotionId: $promotionId) {
+      promotionId
+      promotionName
+      promotionDescription
+      discountPercentage
+      startDate
+      endDate
+      isActive
+      totalProducts
+      totalUnitsSold
+      totalRevenue
+      totalInitialInventory
+      totalCurrentInventory
+      totalInventoryDifference
+      inventoryReductionPercentage
+      averageSkuVariationPercentage
+      lastUpdated
+      productMetrics {
+        productId
+        productName
+        productSku
+        basePrice
+        discountedPrice
+        initialInventory
+        currentInventory
+        inventoryDifference
+        inventoryReductionPercentage
+        unitsSold
+        skuVariationPercentage
+        revenueGenerated
+        category {
+          categoryId
+          categoryName
+          description
+        }
+        lastUpdated
+      }
+    }
+  }
+`;
+
+export const GET_PROMOTION_PRODUCT_METRICS = gql`
+  query GetPromotionProductMetrics($promotionId: ID!) {
+    promotionProductMetrics(promotionId: $promotionId) {
+      productId
+      productName
+      productSku
+      basePrice
+      discountedPrice
+      initialInventory
+      currentInventory
+      inventoryDifference
+      inventoryReductionPercentage
+      unitsSold
+      skuVariationPercentage
+      revenueGenerated
+      category {
+        categoryId
+        categoryName
+        description
+      }
+      lastUpdated
+    }
+  }
+`;
+
+export const INITIALIZE_PROMOTION_METRICS = gql`
+  mutation InitializePromotionMetrics($promotionId: ID!) {
+    initializePromotionMetrics(promotionId: $promotionId)
+  }
+`;
+
+export const SIMULATE_METRICS_UPDATE = gql`
+  mutation SimulateMetricsUpdate($promotionId: ID!, $productId: ID!, $unitsSold: Int!) {
+    simulateMetricsUpdate(promotionId: $promotionId, productId: $productId, unitsSold: $unitsSold)
+  }
+`;
 
