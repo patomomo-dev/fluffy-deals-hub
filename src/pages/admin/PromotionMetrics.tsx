@@ -64,7 +64,7 @@ const PromotionMetrics = () => {
 
   // Datos simulados de métricas con estado para actualizaciones dinámicas
   const [metrics, setMetrics] = useState({
-    revenue: (Math.random() * 50000 + 10000).toFixed(2),
+    revenue: '0.00',
   });
 
   const [productInventory, setProductInventory] = useState<ProductInventory[]>([]);
@@ -76,16 +76,20 @@ const PromotionMetrics = () => {
     }
   }, [promotion]);
 
+  // Calcular ingresos totales basados en la suma de ingresos individuales
+  useEffect(() => {
+    const totalRevenue = productInventory.reduce((sum, item) => sum + item.revenue, 0);
+    setMetrics({
+      revenue: totalRevenue.toFixed(2),
+    });
+  }, [productInventory]);
+
   useEffect(() => {
     const interval = setInterval(() => {
       setIsRefreshing(true);
       
       // Simular actualización de métricas
       setTimeout(() => {
-        setMetrics({
-          revenue: (Math.random() * 50000 + 10000).toFixed(2),
-        });
-        
         if (promotion) {
           setProductInventory(generateProductInventory(promotion));
         }
